@@ -1,0 +1,7 @@
+{
+  "name": "NZ GPT PRO",
+  "description": "نظام محادثة ذكي متطور للمحترفين والمطورين.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
