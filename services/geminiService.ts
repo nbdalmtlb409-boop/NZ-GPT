@@ -1,8 +1,7 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Message, Role } from "../types";
 
-// تعريف process لمنع أخطاء الترجمة حيث يتم حقنه في وقت التشغيل أو عبر HTML
+// تعريف process لمنع أخطاء الترجمة
 declare var process: any;
 
 const SYSTEM_INSTRUCTION = `
@@ -32,7 +31,7 @@ export const sendMessageToNZGPT = async (
   currentImageBase64?: string,
   signal?: AbortSignal
 ): Promise<string> => {
-  // التحقق من وجود مفتاح API قبل المتابعة
+  // التحقق من وجود مفتاح API
   const apiKey = process.env.API_KEY;
   if (!apiKey) {
     throw new Error("API Key is missing. Please check environment settings.");
@@ -40,9 +39,13 @@ export const sendMessageToNZGPT = async (
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const modelName = 'gemini-3-pro-preview';
+    // استخدام موديل فلاش للسرعة وكفاءة التكلفة/الحدود
+    const modelName = 'gemini-3-flash-preview';
 
-    const contents = history.map(msg => ({
+    // نأخذ آخر 5 رسائل فقط من السجل للحفاظ على التناسق والأداء
+    const recentHistory = history.slice(-5);
+
+    const contents = recentHistory.map(msg => ({
       role: msg.role === Role.USER ? 'user' : 'model',
       parts: [
         ...(msg.image ? [{
@@ -70,9 +73,8 @@ export const sendMessageToNZGPT = async (
       contents: [...contents, { role: 'user', parts: currentParts }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        thinkingConfig: { thinkingBudget: 32768 },
-        temperature: 0.8,
-        maxOutputTokens: 8192,
+        temperature: 0.7, // تقليل العشوائية قليلاً لردود أدق
+        // تمت إزالة thinkingConfig لأن موديل Flash لا يدعمها بنفس طريقة Pro ولتحسين السرعة
       }
     });
 
