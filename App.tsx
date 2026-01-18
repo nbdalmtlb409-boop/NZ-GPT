@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, WifiOff, StopCircle, Sparkles, Menu, Plus, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { Send, Paperclip, X, WifiOff, StopCircle, Sparkles, Trash2 } from 'lucide-react';
 import { Message, Role } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
@@ -12,35 +12,11 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showFirstLaunchNotice, setShowFirstLaunchNotice] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    const savedMessages = localStorage.getItem('nz_gpt_history');
-    if (savedMessages) {
-      try {
-        setMessages(JSON.parse(savedMessages));
-      } catch (e) {
-        console.error("Error loading history", e);
-      }
-    }
-
-    const firstLaunch = localStorage.getItem('nz_gpt_launched');
-    if (!firstLaunch) {
-      setShowFirstLaunchNotice(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('nz_gpt_history', JSON.stringify(messages));
-    }
-  }, [messages]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -59,16 +35,9 @@ function App() {
     }
   }, [messages, isLoading]);
 
-  const handleFirstLaunchConfirm = () => {
-    localStorage.setItem('nz_gpt_launched', 'true');
-    setShowFirstLaunchNotice(false);
-  };
-
-  const handleClearHistory = () => {
-    if (window.confirm("هل تريد مسح سجل المحادثات نهائياً من الهاتف؟")) {
+  const handleClearChat = () => {
+    if (messages.length > 0 && window.confirm("هل تريد بدء محادثة جديدة؟ سيتم مسح النصوص الحالية.")) {
       setMessages([]);
-      localStorage.removeItem('nz_gpt_history');
-      setIsSidebarOpen(false);
     }
   };
 
@@ -159,83 +128,28 @@ function App() {
   return (
     <div className="flex h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative">
       
-      {showFirstLaunchNotice && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-[#171717] w-full max-w-sm rounded-[32px] border border-white/10 p-8 shadow-2xl animate-in zoom-in-95 duration-500">
-            <div className="w-16 h-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-6 border border-blue-500/20">
-               <ShieldCheck size={32} className="text-blue-500" />
-            </div>
-            <h2 className="text-2xl font-black mb-4">مرحباً بك في NZ GPT</h2>
-            <p className="text-gray-400 text-sm leading-relaxed mb-8">
-              نود إعلامك بأن جميع محادثاتك وسجلاتك يتم **حفظها فعلياً في ذاكرة هاتفك المحلية** لضمان الخصوصية والسرعة. لا يتم تخزين بياناتك على أي خوادم خارجية.
-            </p>
-            <button 
-              onClick={handleFirstLaunchConfirm}
-              className="w-full py-4 bg-white text-black rounded-2xl font-black flex items-center justify-center gap-3 active:scale-95 transition-all"
-            >
-              <CheckCircle2 size={20} />
-              فهمت ذلك
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div 
-        className={`fixed inset-0 bg-black/60 z-[60] backdrop-blur-sm transition-opacity duration-300 md:hidden ${isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`} 
-        onClick={() => setIsSidebarOpen(false)} 
-      />
-
-      <aside className={`fixed md:relative top-0 right-0 h-full w-[300px] bg-[#171717] z-[70] border-l border-white/5 transition-transform duration-300 ease-out flex flex-col ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}`}>
-        <div className="p-6 flex flex-col h-full">
-          <button onClick={() => { setMessages([]); localStorage.removeItem('nz_gpt_history'); setIsSidebarOpen(false); }} className="flex items-center gap-4 p-5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all active:scale-95 mb-8 shadow-inner">
-            <Plus size={20} className="text-white" />
-            <span className="font-black text-sm uppercase tracking-wider">محادثة جديدة</span>
-          </button>
-          
-          <div className="flex-1 overflow-y-auto space-y-3">
-            <div className="flex items-center justify-between mb-4">
-               <p className="text-[10px] font-black text-gray-500 uppercase tracking-[2px]">السجل المحفوظ (Offline)</p>
-               <button onClick={handleClearHistory} className="text-[9px] font-black text-red-500/70 hover:text-red-500 uppercase">مسح الكل</button>
-            </div>
-            {messages.length > 0 ? (
-              <div className="p-4 bg-white/[0.03] rounded-2xl border-r-4 border-emerald-500 text-sm leading-relaxed text-gray-400 animate-in slide-in-from-right-2">
-                {messages[messages.length - 1].text.slice(0, 80)}...
-              </div>
-            ) : (
-              <div className="text-center py-10 opacity-20">
-                 <p className="text-xs font-bold">لا يوجد سجل حالياً</p>
-              </div>
-            )}
-          </div>
-
-          <div className="mt-auto pt-6 border-t border-white/5">
-             <div className="flex items-center gap-4 p-5 rounded-3xl bg-[#1f1f1f] border border-white/5">
-                <div className="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center font-black shadow-[0_8px_20px_rgba(37,99,235,0.3)]">NZ</div>
-                <div className="flex-1 min-w-0">
-                   <p className="text-sm font-black truncate">NZ GPT PRO</p>
-                   <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">تخزين محلي آمن</p>
-                </div>
-             </div>
-          </div>
-        </div>
-      </aside>
-
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
         
         <header className="h-20 flex items-center justify-between px-6 bg-[#212121]/95 z-50 border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsSidebarOpen(true)} className="p-2 -mr-2 md:hidden active:scale-90 transition-transform">
-              <Menu size={28} />
-            </button>
-            <div className="flex items-center gap-2">
-              <h1 className="font-black text-2xl tracking-tighter">NZ GPT</h1>
-              <span className="bg-emerald-500/20 text-emerald-500 text-[10px] px-2 py-0.5 rounded-md font-black border border-emerald-500/20">OFFLINE-SAVE</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <h1 className="font-black text-2xl tracking-tighter">NZ GPT</h1>
           </div>
           
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
-             <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
-             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">متصل</span>
+          <div className="flex items-center gap-4">
+             {messages.length > 0 && (
+                <button 
+                  onClick={handleClearChat} 
+                  className="p-2 text-gray-500 hover:text-red-500 transition-colors active:scale-90"
+                  title="بدء محادثة جديدة"
+                >
+                  <Trash2 size={20} />
+                </button>
+             )}
+             
+             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
+                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">متصل</span>
+             </div>
           </div>
         </header>
 
@@ -247,7 +161,7 @@ function App() {
                </div>
                <h2 className="text-4xl font-black text-white mb-6 tracking-tighter">قوة المحادثة بين يديك</h2>
                <p className="text-gray-500 text-base max-w-sm leading-relaxed font-medium">
-                  ابدأ محادثة ذكية الآن. جميع ردودي سريعة، دقيقة، ومحفوظة في جهازك للأبد.
+                  ابدأ محادثة ذكية الآن. جميع ردودي سريعة ودقيقة.
                </p>
             </div>
           ) : (
