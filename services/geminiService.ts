@@ -39,8 +39,8 @@ export const sendMessageToNZGPT = async (
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    // استخدام موديل فلاش للسرعة وكفاءة التكلفة/الحدود
-    const modelName = 'gemini-3-flash-preview';
+    // استخدام موديل فلاش 2.5 للسرعة وكفاءة التكلفة
+    const modelName = 'gemini-2.5-flash';
 
     // نأخذ آخر 5 رسائل فقط من السجل للحفاظ على التناسق والأداء
     const recentHistory = history.slice(-5);
@@ -73,8 +73,7 @@ export const sendMessageToNZGPT = async (
       contents: [...contents, { role: 'user', parts: currentParts }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.7, // تقليل العشوائية قليلاً لردود أدق
-        // تمت إزالة thinkingConfig لأن موديل Flash لا يدعمها بنفس طريقة Pro ولتحسين السرعة
+        temperature: 0.7,
       }
     });
 
