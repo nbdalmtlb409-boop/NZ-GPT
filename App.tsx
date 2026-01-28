@@ -5,93 +5,73 @@ import { Message, Role } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
 
-// مكون نافذة الإعلان الأصلي (القديم) - 28487553
-const AdModal = ({ onClose }: { onClose: () => void }) => {
-  const adContainerRef = useRef<HTMLDivElement>(null);
+// مكون بسيط لعرض الإعلان فقط بدون أي نصوص أو نوافذ تعريفية
+// يستخدم Iframe لعزل كود الإعلان وضمان عمل document.write بشكل صحيح
+const AdDirectOverlay = ({ onClose }: { onClose: () => void }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (adContainerRef.current) {
-      adContainerRef.current.innerHTML = '';
-      const configScript = document.createElement('script');
-      configScript.type = 'text/javascript';
-      configScript.text = `
-        atOptions = {
-          'key' : '28487553',
-          'format' : 'iframe',
-          'height' : 50,
-          'width' : 320,
-          'params' : {}
-        };
-      `;
-      const invokeScript = document.createElement('script');
-      invokeScript.type = 'text/javascript';
-      invokeScript.src = '//www.highperformanceformat.com/28487553/invoke.js';
-      adContainerRef.current.appendChild(configScript);
-      adContainerRef.current.appendChild(invokeScript);
+    if (!containerRef.current) return;
+
+    // تنظيف الحاوية
+    containerRef.current.innerHTML = '';
+
+    // إنشاء iframe لعرض الإعلان بداخله
+    const iframe = document.createElement('iframe');
+    // السماح للنوافذ المنبثقة والسكربتات بالعمل
+    iframe.setAttribute('sandbox', 'allow-scripts allow-popups allow-same-origin allow-forms allow-top-navigation');
+    iframe.style.width = '320px';
+    iframe.style.height = '60px'; // زيادة طفيفة للارتفاع لتجنب القص
+    iframe.style.border = 'none';
+    iframe.style.overflow = 'hidden';
+    
+    containerRef.current.appendChild(iframe);
+
+    // كتابة كود الإعلان داخل الـ iframe
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <style>
+              body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; background-color: transparent; overflow: hidden; }
+            </style>
+          </head>
+          <body>
+            <script type="text/javascript">
+              atOptions = {
+                'key' : '28491250',
+                'format' : 'iframe',
+                'height' : 50,
+                'width' : 320,
+                'params' : {}
+              };
+            </script>
+            <script type="text/javascript" src="//www.highperformanceformat.com/28491250/invoke.js"></script>
+          </body>
+        </html>
+      `);
+      doc.close();
     }
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="bg-[#1e1e1e] border border-white/10 rounded-3xl p-6 max-w-sm w-full relative shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col items-center transform transition-all scale-100">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"><X size={24} /></button>
-        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-yellow-500"><Sparkles size={24} /></div>
-        <h3 className="text-white text-lg font-bold mb-2 text-center">فاصل إعلاني</h3>
-        <p className="text-gray-400 text-xs mb-6 text-center max-w-[200px] leading-relaxed">دعمك يساعدنا على توفير NZ GPT مجاناً للجميع</p>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="relative bg-[#212121] p-1 rounded-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+        {/* زر إغلاق صغير فقط */}
+        <button 
+          onClick={onClose} 
+          className="absolute -top-3 -right-3 bg-red-600 text-white rounded-full p-1.5 shadow-lg hover:bg-red-700 transition-colors z-50"
+        >
+          <X size={16} strokeWidth={3} />
+        </button>
         
-        {/* حاوية الإعلان الأول */}
-        <div ref={adContainerRef} className="bg-white/5 rounded-xl overflow-hidden min-h-[60px] flex items-center justify-center w-full border border-white/5 py-2"></div>
-        
-        <button onClick={onClose} className="mt-6 w-full py-3.5 bg-white text-black font-bold rounded-xl hover:bg-gray-200 active:scale-95 transition-all shadow-lg">متابعة المحادثة</button>
-      </div>
-    </div>
-  );
-};
-
-// مكون نافذة الإعلان الثاني (Popunder) - 28491250
-// تم تعديله ليجلب الإعلان الحقيقي من Adsterra
-const PopunderModal = ({ onClose }: { onClose: () => void }) => {
-  const adContainerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (adContainerRef.current) {
-      adContainerRef.current.innerHTML = '';
-      
-      // إعدادات الإعلان الجديد (Popunder) بالمعرف 28491250
-      const configScript = document.createElement('script');
-      configScript.type = 'text/javascript';
-      configScript.text = `
-        atOptions = {
-          'key' : '28491250',
-          'format' : 'iframe',
-          'height' : 50,
-          'width' : 320,
-          'params' : {}
-        };
-      `;
-      
-      const invokeScript = document.createElement('script');
-      invokeScript.type = 'text/javascript';
-      invokeScript.src = '//www.highperformanceformat.com/28491250/invoke.js';
-      
-      adContainerRef.current.appendChild(configScript);
-      adContainerRef.current.appendChild(invokeScript);
-    }
-  }, []);
-
-  // z-[101] ليظهر فوق الإعلان القديم
-  return (
-    <div className="fixed inset-0 z-[101] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in zoom-in-95 duration-300">
-      <div className="bg-[#2a2a2a] border border-emerald-500/20 rounded-3xl p-6 max-w-sm w-full relative shadow-[0_0_60px_rgba(0,0,0,0.8)] flex flex-col items-center">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"><X size={24} /></button>
-        <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4 text-emerald-500"><Sparkles size={24} /></div>
-        <h3 className="text-white text-lg font-bold mb-2 text-center">إعلان مميز</h3>
-        <p className="text-gray-400 text-xs mb-6 text-center max-w-[200px] leading-relaxed">شريك إعلاني</p>
-        
-        {/* حاوية الإعلان الثاني - سيتم تحميل إعلان Adsterra هنا */}
-        <div ref={adContainerRef} className="bg-black/30 rounded-xl overflow-hidden min-h-[60px] flex items-center justify-center w-full border border-white/5 py-2"></div>
-        
-        <button onClick={onClose} className="mt-6 w-full py-3.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 active:scale-95 transition-all shadow-lg">إغلاق</button>
+        {/* حاوية الإعلان */}
+        <div ref={containerRef} className="bg-black/20 flex items-center justify-center rounded overflow-hidden">
+          {/* سيتم حقن الـ iframe هنا */}
+        </div>
       </div>
     </div>
   );
@@ -105,10 +85,9 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
-  // States للإعلانات
+  // State للإعلان
   const [msgCount, setMsgCount] = useState(0);
-  const [showAdModal, setShowAdModal] = useState(false);       // للإعلان القديم
-  const [showPopunder, setShowPopunder] = useState(false);     // للإعلان الجديد
+  const [showAd, setShowAd] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,12 +152,9 @@ function App() {
     const tempImage = selectedImage;
     setSelectedImage(null);
     
-    // منطق الإعلانات: إظهار الإعلانين عند كل رسالتين
+    // منطق الإعلان: يظهر مباشرة كل رسالتين
     if (newCount > 0 && newCount % 2 === 0) {
-      // إظهار الإعلان القديم (28487553)
-      setTimeout(() => setShowAdModal(true), 1500);
-      // إظهار الإعلان الجديد (28491250) فوقه بتأخير بسيط
-      setTimeout(() => setShowPopunder(true), 1600);
+      setTimeout(() => setShowAd(true), 1000);
     }
     
     setIsLoading(true);
@@ -238,11 +214,8 @@ function App() {
   return (
     <div className="flex h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative">
       
-      {/* نافذة الإعلان القديم */}
-      {showAdModal && <AdModal onClose={() => setShowAdModal(false)} />}
-      
-      {/* نافذة الإعلان الجديد (Popunder) - ستظهر فوق القديمة */}
-      {showPopunder && <PopunderModal onClose={() => setShowPopunder(false)} />}
+      {/* عرض الإعلان مباشرة عند تحقق الشرط */}
+      {showAd && <AdDirectOverlay onClose={() => setShowAd(false)} />}
 
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
         
