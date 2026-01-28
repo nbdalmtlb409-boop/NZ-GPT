@@ -5,7 +5,7 @@ import { Message, Role } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
 
-// مكون نافذة الإعلان الأصلي (القديم)
+// مكون نافذة الإعلان الأصلي (القديم) - 28487553
 const AdModal = ({ onClose }: { onClose: () => void }) => {
   const adContainerRef = useRef<HTMLDivElement>(null);
 
@@ -38,21 +38,26 @@ const AdModal = ({ onClose }: { onClose: () => void }) => {
         <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-yellow-500"><Sparkles size={24} /></div>
         <h3 className="text-white text-lg font-bold mb-2 text-center">فاصل إعلاني</h3>
         <p className="text-gray-400 text-xs mb-6 text-center max-w-[200px] leading-relaxed">دعمك يساعدنا على توفير NZ GPT مجاناً للجميع</p>
+        
+        {/* حاوية الإعلان الأول */}
         <div ref={adContainerRef} className="bg-white/5 rounded-xl overflow-hidden min-h-[60px] flex items-center justify-center w-full border border-white/5 py-2"></div>
+        
         <button onClick={onClose} className="mt-6 w-full py-3.5 bg-white text-black font-bold rounded-xl hover:bg-gray-200 active:scale-95 transition-all shadow-lg">متابعة المحادثة</button>
       </div>
     </div>
   );
 };
 
-// مكون نافذة الإعلان الجديد (Popunder)
+// مكون نافذة الإعلان الثاني (Popunder) - 28491250
+// تم تعديله ليجلب الإعلان الحقيقي من Adsterra
 const PopunderModal = ({ onClose }: { onClose: () => void }) => {
   const adContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (adContainerRef.current) {
       adContainerRef.current.innerHTML = '';
-      // إعدادات الإعلان الجديد (Popunder)
+      
+      // إعدادات الإعلان الجديد (Popunder) بالمعرف 28491250
       const configScript = document.createElement('script');
       configScript.type = 'text/javascript';
       configScript.text = `
@@ -64,9 +69,11 @@ const PopunderModal = ({ onClose }: { onClose: () => void }) => {
           'params' : {}
         };
       `;
+      
       const invokeScript = document.createElement('script');
       invokeScript.type = 'text/javascript';
       invokeScript.src = '//www.highperformanceformat.com/28491250/invoke.js';
+      
       adContainerRef.current.appendChild(configScript);
       adContainerRef.current.appendChild(invokeScript);
     }
@@ -79,8 +86,11 @@ const PopunderModal = ({ onClose }: { onClose: () => void }) => {
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"><X size={24} /></button>
         <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4 text-emerald-500"><Sparkles size={24} /></div>
         <h3 className="text-white text-lg font-bold mb-2 text-center">إعلان مميز</h3>
-        <p className="text-gray-400 text-xs mb-6 text-center max-w-[200px] leading-relaxed">شكراً لاستخدامك NZ GPT PRO</p>
+        <p className="text-gray-400 text-xs mb-6 text-center max-w-[200px] leading-relaxed">شريك إعلاني</p>
+        
+        {/* حاوية الإعلان الثاني - سيتم تحميل إعلان Adsterra هنا */}
         <div ref={adContainerRef} className="bg-black/30 rounded-xl overflow-hidden min-h-[60px] flex items-center justify-center w-full border border-white/5 py-2"></div>
+        
         <button onClick={onClose} className="mt-6 w-full py-3.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 active:scale-95 transition-all shadow-lg">إغلاق</button>
       </div>
     </div>
@@ -165,9 +175,9 @@ function App() {
     
     // منطق الإعلانات: إظهار الإعلانين عند كل رسالتين
     if (newCount > 0 && newCount % 2 === 0) {
-      // إظهار الإعلان القديم
+      // إظهار الإعلان القديم (28487553)
       setTimeout(() => setShowAdModal(true), 1500);
-      // إظهار الإعلان الجديد (Popunder) بتأخير بسيط جداً ليظهر فوق القديم
+      // إظهار الإعلان الجديد (28491250) فوقه بتأخير بسيط
       setTimeout(() => setShowPopunder(true), 1600);
     }
     
