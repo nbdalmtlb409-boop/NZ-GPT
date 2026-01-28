@@ -5,6 +5,88 @@ import { Message, Role } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
 
+// مكون نافذة الإعلان الأصلي (القديم)
+const AdModal = ({ onClose }: { onClose: () => void }) => {
+  const adContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (adContainerRef.current) {
+      adContainerRef.current.innerHTML = '';
+      const configScript = document.createElement('script');
+      configScript.type = 'text/javascript';
+      configScript.text = `
+        atOptions = {
+          'key' : '28487553',
+          'format' : 'iframe',
+          'height' : 50,
+          'width' : 320,
+          'params' : {}
+        };
+      `;
+      const invokeScript = document.createElement('script');
+      invokeScript.type = 'text/javascript';
+      invokeScript.src = '//www.highperformanceformat.com/28487553/invoke.js';
+      adContainerRef.current.appendChild(configScript);
+      adContainerRef.current.appendChild(invokeScript);
+    }
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+      <div className="bg-[#1e1e1e] border border-white/10 rounded-3xl p-6 max-w-sm w-full relative shadow-[0_0_50px_rgba(0,0,0,0.5)] flex flex-col items-center transform transition-all scale-100">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"><X size={24} /></button>
+        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-4 text-yellow-500"><Sparkles size={24} /></div>
+        <h3 className="text-white text-lg font-bold mb-2 text-center">فاصل إعلاني</h3>
+        <p className="text-gray-400 text-xs mb-6 text-center max-w-[200px] leading-relaxed">دعمك يساعدنا على توفير NZ GPT مجاناً للجميع</p>
+        <div ref={adContainerRef} className="bg-white/5 rounded-xl overflow-hidden min-h-[60px] flex items-center justify-center w-full border border-white/5 py-2"></div>
+        <button onClick={onClose} className="mt-6 w-full py-3.5 bg-white text-black font-bold rounded-xl hover:bg-gray-200 active:scale-95 transition-all shadow-lg">متابعة المحادثة</button>
+      </div>
+    </div>
+  );
+};
+
+// مكون نافذة الإعلان الجديد (Popunder)
+const PopunderModal = ({ onClose }: { onClose: () => void }) => {
+  const adContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (adContainerRef.current) {
+      adContainerRef.current.innerHTML = '';
+      // إعدادات الإعلان الجديد (Popunder)
+      const configScript = document.createElement('script');
+      configScript.type = 'text/javascript';
+      configScript.text = `
+        atOptions = {
+          'key' : '28491250',
+          'format' : 'iframe',
+          'height' : 50,
+          'width' : 320,
+          'params' : {}
+        };
+      `;
+      const invokeScript = document.createElement('script');
+      invokeScript.type = 'text/javascript';
+      invokeScript.src = '//www.highperformanceformat.com/28491250/invoke.js';
+      adContainerRef.current.appendChild(configScript);
+      adContainerRef.current.appendChild(invokeScript);
+    }
+  }, []);
+
+  // z-[101] ليظهر فوق الإعلان القديم
+  return (
+    <div className="fixed inset-0 z-[101] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 animate-in zoom-in-95 duration-300">
+      <div className="bg-[#2a2a2a] border border-emerald-500/20 rounded-3xl p-6 max-w-sm w-full relative shadow-[0_0_60px_rgba(0,0,0,0.8)] flex flex-col items-center">
+        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"><X size={24} /></button>
+        <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mb-4 text-emerald-500"><Sparkles size={24} /></div>
+        <h3 className="text-white text-lg font-bold mb-2 text-center">إعلان مميز</h3>
+        <p className="text-gray-400 text-xs mb-6 text-center max-w-[200px] leading-relaxed">شكراً لاستخدامك NZ GPT PRO</p>
+        <div ref={adContainerRef} className="bg-black/30 rounded-xl overflow-hidden min-h-[60px] flex items-center justify-center w-full border border-white/5 py-2"></div>
+        <button onClick={onClose} className="mt-6 w-full py-3.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-500 active:scale-95 transition-all shadow-lg">إغلاق</button>
+      </div>
+    </div>
+  );
+};
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -13,6 +95,11 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
+  // States للإعلانات
+  const [msgCount, setMsgCount] = useState(0);
+  const [showAdModal, setShowAdModal] = useState(false);       // للإعلان القديم
+  const [showPopunder, setShowPopunder] = useState(false);     // للإعلان الجديد
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -38,6 +125,7 @@ function App() {
   const handleClearChat = () => {
     if (messages.length > 0 && window.confirm("هل تريد بدء محادثة جديدة؟ سيتم مسح النصوص الحالية.")) {
       setMessages([]);
+      setMsgCount(0);
     }
   };
 
@@ -58,6 +146,10 @@ function App() {
     const textToSend = textOverride || inputText;
     if ((!textToSend.trim() && !selectedImage) || isLoading || isStreaming) return;
 
+    // تحديث عداد الرسائل
+    const newCount = msgCount + 1;
+    setMsgCount(newCount);
+
     const newMessage: Message = {
       id: Date.now().toString(),
       role: Role.USER,
@@ -70,6 +162,14 @@ function App() {
     setInputText('');
     const tempImage = selectedImage;
     setSelectedImage(null);
+    
+    // منطق الإعلانات: إظهار الإعلانين عند كل رسالتين
+    if (newCount > 0 && newCount % 2 === 0) {
+      // إظهار الإعلان القديم
+      setTimeout(() => setShowAdModal(true), 1500);
+      // إظهار الإعلان الجديد (Popunder) بتأخير بسيط جداً ليظهر فوق القديم
+      setTimeout(() => setShowPopunder(true), 1600);
+    }
     
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
@@ -128,6 +228,12 @@ function App() {
   return (
     <div className="flex h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative">
       
+      {/* نافذة الإعلان القديم */}
+      {showAdModal && <AdModal onClose={() => setShowAdModal(false)} />}
+      
+      {/* نافذة الإعلان الجديد (Popunder) - ستظهر فوق القديمة */}
+      {showPopunder && <PopunderModal onClose={() => setShowPopunder(false)} />}
+
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
         
         <header className="h-20 flex items-center justify-between px-6 bg-[#212121]/95 z-50 border-b border-white/5 shrink-0">
