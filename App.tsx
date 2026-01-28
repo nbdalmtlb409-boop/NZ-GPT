@@ -165,7 +165,7 @@ function App() {
                </p>
             </div>
           ) : (
-            <div className="w-full pb-40">
+            <div className="w-full pb-56">
               {messages.map(msg => <MessageItem key={msg.id} message={msg} />)}
               {isLoading && (
                 <div className="py-16 px-8">
@@ -186,7 +186,7 @@ function App() {
           )}
         </main>
 
-        <div className="p-6 bg-gradient-to-t from-[#212121] via-[#212121]/95 to-transparent absolute bottom-0 left-0 right-0 z-50">
+        <div className="p-6 bg-gradient-to-t from-[#212121] via-[#212121]/95 to-transparent absolute bottom-[50px] left-0 right-0 z-50">
           <div className="max-w-3xl mx-auto safe-pb px-2">
             
             {selectedImage && (
