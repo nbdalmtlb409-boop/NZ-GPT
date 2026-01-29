@@ -5,78 +5,6 @@ import { Message, Role } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
 
-// مكون بسيط لعرض الإعلان فقط بدون أي نصوص أو نوافذ تعريفية
-// يستخدم Iframe لعزل كود الإعلان وضمان عمل document.write بشكل صحيح
-const AdDirectOverlay = ({ onClose }: { onClose: () => void }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    // تنظيف الحاوية
-    containerRef.current.innerHTML = '';
-
-    // إنشاء iframe لعرض الإعلان بداخله
-    const iframe = document.createElement('iframe');
-    // السماح للنوافذ المنبثقة والسكربتات بالعمل
-    iframe.setAttribute('sandbox', 'allow-scripts allow-popups allow-same-origin allow-forms allow-top-navigation');
-    iframe.style.width = '320px';
-    iframe.style.height = '60px'; // زيادة طفيفة للارتفاع لتجنب القص
-    iframe.style.border = 'none';
-    iframe.style.overflow = 'hidden';
-    
-    containerRef.current.appendChild(iframe);
-
-    // كتابة كود الإعلان داخل الـ iframe
-    const doc = iframe.contentWindow?.document;
-    if (doc) {
-      doc.open();
-      doc.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <style>
-              body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; background-color: transparent; overflow: hidden; }
-            </style>
-          </head>
-          <body>
-            <script type="text/javascript">
-              atOptions = {
-                'key' : '28491250',
-                'format' : 'iframe',
-                'height' : 50,
-                'width' : 320,
-                'params' : {}
-              };
-            </script>
-            <script type="text/javascript" src="//www.highperformanceformat.com/28491250/invoke.js"></script>
-          </body>
-        </html>
-      `);
-      doc.close();
-    }
-  }, []);
-
-  return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative bg-[#212121] p-1 rounded-lg border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)]">
-        {/* زر إغلاق صغير فقط */}
-        <button 
-          onClick={onClose} 
-          className="absolute -top-3 -right-3 bg-red-600 text-white rounded-full p-1.5 shadow-lg hover:bg-red-700 transition-colors z-50"
-        >
-          <X size={16} strokeWidth={3} />
-        </button>
-        
-        {/* حاوية الإعلان */}
-        <div ref={containerRef} className="bg-black/20 flex items-center justify-center rounded overflow-hidden">
-          {/* سيتم حقن الـ iframe هنا */}
-        </div>
-      </div>
-    </div>
-  );
-};
-
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -85,10 +13,6 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
-  // State للإعلان
-  const [msgCount, setMsgCount] = useState(0);
-  const [showAd, setShowAd] = useState(false);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -114,7 +38,6 @@ function App() {
   const handleClearChat = () => {
     if (messages.length > 0 && window.confirm("هل تريد بدء محادثة جديدة؟ سيتم مسح النصوص الحالية.")) {
       setMessages([]);
-      setMsgCount(0);
     }
   };
 
@@ -135,10 +58,6 @@ function App() {
     const textToSend = textOverride || inputText;
     if ((!textToSend.trim() && !selectedImage) || isLoading || isStreaming) return;
 
-    // تحديث عداد الرسائل
-    const newCount = msgCount + 1;
-    setMsgCount(newCount);
-
     const newMessage: Message = {
       id: Date.now().toString(),
       role: Role.USER,
@@ -151,11 +70,6 @@ function App() {
     setInputText('');
     const tempImage = selectedImage;
     setSelectedImage(null);
-    
-    // منطق الإعلان: يظهر مباشرة كل رسالتين
-    if (newCount > 0 && newCount % 2 === 0) {
-      setTimeout(() => setShowAd(true), 1000);
-    }
     
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
@@ -212,137 +126,146 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative">
+    <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden">
       
-      {/* عرض الإعلان مباشرة عند تحقق الشرط */}
-      {showAd && <AdDirectOverlay onClose={() => setShowAd(false)} />}
-
-      <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
+      {/* Header */}
+      <header className="h-16 flex items-center justify-between px-6 bg-[#212121]/95 z-50 border-b border-white/5 shrink-0">
+        <div className="flex items-center gap-2">
+          <h1 className="font-black text-xl tracking-tighter">NZ GPT</h1>
+        </div>
         
-        <header className="h-20 flex items-center justify-between px-6 bg-[#212121]/95 z-50 border-b border-white/5 shrink-0">
-          <div className="flex items-center gap-2">
-            <h1 className="font-black text-2xl tracking-tighter">NZ GPT</h1>
-          </div>
-          
-          <div className="flex items-center gap-4">
-             {messages.length > 0 && (
-                <button 
-                  onClick={handleClearChat} 
-                  className="p-2 text-gray-500 hover:text-red-500 transition-colors active:scale-90"
-                  title="بدء محادثة جديدة"
-                >
-                  <Trash2 size={20} />
-                </button>
-             )}
-             
-             <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10">
-                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">متصل</span>
-             </div>
-          </div>
-        </header>
-
-        <main className="flex-1 overflow-y-auto pt-4 selection:bg-blue-500/30">
-          {messages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center p-12 text-center animate-in fade-in duration-1000">
-               <div className="w-24 h-24 mb-10 bg-white/5 rounded-[40px] flex items-center justify-center text-white/10 shadow-inner -rotate-6 border border-white/5">
-                  <Sparkles size={56} />
-               </div>
-               <h2 className="text-4xl font-black text-white mb-6 tracking-tighter">قوة المحادثة بين يديك</h2>
-               <p className="text-gray-500 text-base max-w-sm leading-relaxed font-medium">
-                  ابدأ محادثة ذكية الآن. جميع ردودي سريعة ودقيقة.
-               </p>
+        <div className="flex items-center gap-4">
+            {messages.length > 0 && (
+              <button 
+                onClick={handleClearChat} 
+                className="p-2 text-gray-500 hover:text-red-500 transition-colors active:scale-90"
+                title="بدء محادثة جديدة"
+              >
+                <Trash2 size={18} />
+              </button>
+            )}
+            
+            <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
+              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">متصل</span>
             </div>
-          ) : (
-            <div className="w-full pb-56">
-              {messages.map(msg => <MessageItem key={msg.id} message={msg} />)}
-              {isLoading && (
-                <div className="py-16 px-8">
-                  <div className="max-w-3xl mx-auto flex gap-6 items-start">
-                    <div className="w-12 h-12 rounded-[18px] bg-emerald-600 flex items-center justify-center shrink-0 shadow-2xl animate-pulse">
-                      <Sparkles size={24} className="text-white" />
-                    </div>
-                    <div className="flex gap-2.5 mt-5">
-                      <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce"></div>
-                      <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                      <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                    </div>
+        </div>
+      </header>
+
+      {/* Main Chat Area */}
+      <main className="flex-1 overflow-y-auto w-full selection:bg-blue-500/30">
+        {messages.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-1000">
+              <div className="w-20 h-20 mb-8 bg-white/5 rounded-[32px] flex items-center justify-center text-white/10 shadow-inner -rotate-6 border border-white/5">
+                <Sparkles size={48} />
+              </div>
+              <h2 className="text-3xl font-black text-white mb-4 tracking-tighter">مرحباً بك</h2>
+              <p className="text-gray-500 text-sm max-w-xs leading-relaxed font-medium">
+                أنا NZ GPT PRO. كيف يمكنني مساعدتك اليوم في مهامك البرمجية؟
+              </p>
+          </div>
+        ) : (
+          <div className="w-full pb-6">
+            {messages.map(msg => <MessageItem key={msg.id} message={msg} />)}
+            {isLoading && (
+              <div className="py-12 px-8">
+                <div className="max-w-3xl mx-auto flex gap-6 items-start">
+                  <div className="w-10 h-10 rounded-[14px] bg-emerald-600 flex items-center justify-center shrink-0 shadow-2xl animate-pulse">
+                    <Sparkles size={20} className="text-white" />
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce [animation-delay:0.4s]"></div>
                   </div>
                 </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </main>
-
-        <div className="p-6 bg-gradient-to-t from-[#212121] via-[#212121]/95 to-transparent absolute bottom-[50px] left-0 right-0 z-50">
-          <div className="max-w-3xl mx-auto safe-pb px-2">
-            
-            {selectedImage && (
-              <div className="absolute -top-24 right-4 p-3 bg-[#2f2f2f] rounded-3xl border border-white/10 shadow-2xl animate-in slide-in-from-bottom-10 z-50">
-                <img src={selectedImage} className="h-16 w-16 object-cover rounded-2xl shadow-lg" />
-                <button onClick={() => setSelectedImage(null)} className="absolute -top-3 -left-3 bg-white text-black rounded-full p-1.5 shadow-2xl border border-black/10 active:scale-75 transition-transform"><X size={12} /></button>
               </div>
             )}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </main>
 
-            <div className="bg-[#2f2f2f] border border-white/10 rounded-[28px] shadow-[0_15px_40px_rgba(0,0,0,0.4)] flex items-end overflow-hidden focus-within:border-white/20 transition-all">
-              {/* زر مشبك الورق المصمم بعناية */}
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="p-4 text-gray-400 hover:text-white active:scale-90 transition-all shrink-0 self-center"
-              >
-                <Paperclip size={20} />
-              </button>
-              
-              {/* إخفاء مدخل الملفات تماماً بالـ CSS */}
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                accept="image/*" 
-                onChange={handleImageUpload} 
-                className="hidden" 
-                style={{ display: 'none' }}
-              />
+      {/* Adsterra Banner 320x50 */}
+      <div 
+        className="w-full flex justify-center bg-[#212121] py-1 shrink-0"
+        dangerouslySetInnerHTML={{ __html: `
+          <iframe 
+            srcdoc="<html><body style='margin:0;padding:0;background:transparent;display:flex;justify-content:center;align-items:center;'><script>atOptions = {'key' : '1306df10c9f2f6deae48cc2aa33f8f8e','format' : 'iframe','height' : 50,'width' : 320,'params' : {}};</script><script src='https://www.highperformanceformat.com/1306df10c9f2f6deae48cc2aa33f8f8e/invoke.js'></script></body></html>"
+            width="320"
+            height="50"
+            style="border:none;overflow:hidden;"
+            scrolling="no"
+            frameborder="0"
+          ></iframe>
+        `}} 
+      />
 
-              <textarea 
-                ref={textareaRef}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSendMessage())}
-                placeholder="اكتب رسالتك هنا..."
-                className="flex-1 bg-transparent border-none focus:ring-0 text-[16px] py-4 px-1 min-h-[56px] max-h-40 text-white placeholder-gray-500 font-medium overflow-y-auto"
-                rows={1}
-                onInput={(e) => {
-                  const target = e.target as HTMLTextAreaElement;
-                  target.style.height = 'auto';
-                  target.style.height = `${Math.min(target.scrollHeight, 160)}px`;
-                }}
-              />
-
-              <div className="p-2 shrink-0 self-center">
-                {isLoading || isStreaming ? (
-                  <button onClick={() => abortControllerRef.current?.abort()} className="p-3 bg-white text-black rounded-full hover:bg-gray-100 shadow-xl active:scale-90 transition-all">
-                    <StopCircle size={18} />
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => handleSendMessage()}
-                    disabled={!inputText.trim() && !selectedImage}
-                    className={`p-3 rounded-full transition-all ${(!inputText.trim() && !selectedImage) ? 'text-gray-700 bg-transparent opacity-10' : 'bg-white text-black shadow-2xl active:scale-90'}`}
-                  >
-                    <Send size={18} fill="currentColor" />
-                  </button>
-                )}
-              </div>
+      {/* Input Area */}
+      <div className="bg-[#212121] border-t border-white/5 p-4 safe-pb z-40 relative">
+        <div className="max-w-3xl mx-auto relative">
+          
+          {selectedImage && (
+            <div className="absolute -top-24 right-0 p-2 bg-[#2f2f2f] rounded-2xl border border-white/10 shadow-xl animate-in slide-in-from-bottom-5 z-50">
+              <img src={selectedImage} className="h-14 w-14 object-cover rounded-xl" />
+              <button onClick={() => setSelectedImage(null)} className="absolute -top-2 -left-2 bg-red-500 text-white rounded-full p-1 shadow-lg active:scale-90"><X size={12} /></button>
             </div>
+          )}
+
+          <div className="bg-[#2f2f2f] border border-white/10 rounded-[24px] shadow-lg flex items-end overflow-hidden focus-within:border-white/20 transition-all">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="p-3.5 text-gray-400 hover:text-white active:scale-90 transition-all shrink-0 self-center"
+            >
+              <Paperclip size={18} />
+            </button>
             
-            <div className="flex justify-center mt-3">
-               <p className="text-[9px] text-gray-600 font-black tracking-[3px] uppercase opacity-50">NZ GPT PRO ENGINE</p>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              accept="image/*" 
+              onChange={handleImageUpload} 
+              className="hidden" 
+            />
+
+            <textarea 
+              ref={textareaRef}
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSendMessage())}
+              placeholder="اكتب رسالتك..."
+              className="flex-1 bg-transparent border-none focus:ring-0 text-[15px] py-3.5 px-1 min-h-[50px] max-h-32 text-white placeholder-gray-500 font-medium overflow-y-auto"
+              rows={1}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = 'auto';
+                target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+              }}
+            />
+
+            <div className="p-1.5 shrink-0 self-center">
+              {isLoading || isStreaming ? (
+                <button onClick={() => abortControllerRef.current?.abort()} className="p-2.5 bg-white text-black rounded-full hover:bg-gray-100 shadow-md active:scale-90 transition-all">
+                  <StopCircle size={16} />
+                </button>
+              ) : (
+                <button 
+                  onClick={() => handleSendMessage()}
+                  disabled={!inputText.trim() && !selectedImage}
+                  className={`p-2.5 rounded-full transition-all ${(!inputText.trim() && !selectedImage) ? 'text-gray-600 bg-transparent' : 'bg-emerald-600 text-white shadow-lg active:scale-90'}`}
+                >
+                  <Send size={16} fill="currentColor" />
+                </button>
+              )}
             </div>
           </div>
+          
+          <div className="flex justify-center mt-2">
+             <p className="text-[8px] text-gray-600 font-bold tracking-[2px] uppercase opacity-40">NZ GPT PRO</p>
+          </div>
         </div>
-
       </div>
+
     </div>
   );
 }
