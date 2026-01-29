@@ -13,6 +13,9 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
+  // حالة لتحديث الإعلان
+  const [adRefreshKey, setAdRefreshKey] = useState(0);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -27,6 +30,15 @@ function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
+  }, []);
+
+  // دالة لتحديث الإعلان كل 60 ثانية
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAdRefreshKey(prev => prev + 1);
+    }, 60000); // 60000 ميلي ثانية = 1 دقيقة
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -188,6 +200,7 @@ function App() {
 
       {/* Adsterra Banner 320x50 */}
       <div 
+        key={adRefreshKey}
         className="w-full flex justify-center bg-[#212121] py-1 shrink-0"
         dangerouslySetInnerHTML={{ __html: `
           <iframe 
