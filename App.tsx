@@ -32,11 +32,11 @@ function App() {
     };
   }, []);
 
-  // دالة لتحديث الإعلان كل 10 ثواني
+  // دالة لتحديث الإعلان كل 30 ثانية
   useEffect(() => {
     const interval = setInterval(() => {
       setAdRefreshKey(prev => prev + 1);
-    }, 10000); // 10000 ميلي ثانية = 10 ثواني
+    }, 30000); // 30000 ميلي ثانية = 30 ثانية
 
     return () => clearInterval(interval);
   }, []);
