@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, WifiOff, StopCircle, Sparkles, Trash2 } from 'lucide-react';
+import { Send, Paperclip, X, WifiOff, StopCircle, Sparkles, Trash2, Heart } from 'lucide-react';
 import { Message, Role } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
@@ -13,7 +13,10 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
-  // حالة لتحديث الإعلان
+  // حالة النافذة المنبثقة للترحيب/الشكر (مستقلة تماماً)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(true);
+  
+  // حالة لتحديث الإعلان السفلي (اختياري)
   const [adRefreshKey, setAdRefreshKey] = useState(0);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -32,11 +35,26 @@ function App() {
     };
   }, []);
 
+  // إضافة إعلان Social Bar مرة واحدة عند بدء التشغيل
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = "https://pl28607884.effectivegatecpm.com/e3/f7/9f/e3f79fb9b5951a94b0a556c23f8d9494.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      // تنظيف السكربت عند إزالة المكون (اختياري، لكن جيد للممارسات البرمجية)
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, []);
+
   // دالة لتحديث الإعلان كل 30 ثانية
   useEffect(() => {
     const interval = setInterval(() => {
       setAdRefreshKey(prev => prev + 1);
-    }, 30000); // 30000 ميلي ثانية = 30 ثانية
+    }, 30000); 
 
     return () => clearInterval(interval);
   }, []);
@@ -138,8 +156,36 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden">
+    <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative">
       
+      {/* Welcome Popup Modal - نافذة الشكر والتقدير */}
+      {showWelcomeModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-300">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl p-8 max-w-sm w-full shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300 flex flex-col items-center text-center">
+            <div className="w-16 h-16 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-full flex items-center justify-center mb-6 border border-emerald-500/20 shadow-[0_0_20px_rgba(16,185,129,0.15)]">
+               <Heart className="text-emerald-500 w-7 h-7 fill-emerald-500/20" />
+            </div>
+            
+            <h2 className="text-xl font-black text-white mb-3 tracking-tight">إهداء وتقدير</h2>
+            
+            <div className="w-12 h-1 bg-emerald-500/30 rounded-full mb-6"></div>
+
+            <p className="text-gray-300 text-[15px] leading-7 font-medium mb-8">
+              كل الشكر للمطور
+              <br/>
+              <span className="text-emerald-400 font-bold text-lg block mt-1">نصرالدين عبد المطلب الزايدي</span>
+            </p>
+            
+            <button
+              onClick={() => setShowWelcomeModal(false)}
+              className="w-full py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold transition-all active:scale-95 shadow-lg shadow-emerald-900/20"
+            >
+              موافق
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="h-16 flex items-center justify-between px-6 bg-[#212121]/95 z-50 border-b border-white/5 shrink-0">
         <div className="flex items-center gap-2">
