@@ -35,22 +35,7 @@ function App() {
     };
   }, []);
 
-  // إضافة إعلان Social Bar مرة واحدة عند بدء التشغيل
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = "https://pl28607884.effectivegatecpm.com/e3/f7/9f/e3f79fb9b5951a94b0a556c23f8d9494.js";
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      // تنظيف السكربت عند إزالة المكون (اختياري، لكن جيد للممارسات البرمجية)
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
-  }, []);
-
-  // دالة لتحديث الإعلان كل 30 ثانية
+  // دالة لتحديث الإعلان السفلي كل 30 ثانية
   useEffect(() => {
     const interval = setInterval(() => {
       setAdRefreshKey(prev => prev + 1);
@@ -85,6 +70,30 @@ function App() {
 
   const handleSendMessage = async (textOverride?: string) => {
     if (!isOnline) return;
+    
+    // منطق الإعلان: يعمل عند إرسال رسالة فقط
+    try {
+      const STORAGE_KEY = 'nz_popunder_timer';
+      const COOLDOWN = 360000; // 6 دقائق (360,000 مللي ثانية)
+      const lastShown = localStorage.getItem(STORAGE_KEY);
+      const now = Date.now();
+
+      // التحقق: إذا لم يتم عرضه من قبل أو مرت 6 دقائق
+      if (!lastShown || (now - parseInt(lastShown) > COOLDOWN)) {
+        localStorage.setItem(STORAGE_KEY, now.toString());
+        
+        // حقن السكربت عند إرسال الرسالة
+        const script = document.createElement('script');
+        script.src = "https://pl28591749.effectivegatecpm.com/57/e0/a8/57e0a890f94e142c034f01797d447fec.js";
+        script.async = true;
+        document.body.appendChild(script);
+        
+        console.log('NZ GPT: Ad injected on message send');
+      }
+    } catch (e) {
+      console.error("Ad injection error", e);
+    }
+
     const textToSend = textOverride || inputText;
     if ((!textToSend.trim() && !selectedImage) || isLoading || isStreaming) return;
 
