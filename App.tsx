@@ -8,7 +8,7 @@ import MessageItem from './components/MessageItem';
 // Firebase Imports
 import { auth, googleProvider, db, isFirebaseInitialized } from './firebaseConfig';
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { collection, addDoc, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 
 function App() {
   // Authentication State
@@ -41,7 +41,9 @@ function App() {
   // Helper to show notification
   const showNotification = (message: string, type: 'error' | 'success' = 'error') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification(null), 5000);
+    // زيادة الوقت لقراءة رسائل الخطأ بشكل أفضل (10 ثواني للخطأ)
+    const duration = type === 'error' ? 10000 : 4000;
+    setTimeout(() => setNotification(null), duration);
   };
 
   // --- Authentication Monitor ---
@@ -59,18 +61,24 @@ function App() {
         // Load Real Cloud History from Firebase
         const q = query(
           collection(db, "chats"), 
-          where("userId", "==", currentUser.uid),
-          orderBy("updatedAt", "desc")
+          where("userId", "==", currentUser.uid)
         );
+        
         const unsubscribeChats = onSnapshot(q, (snapshot) => {
           const history = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           } as ChatSession));
+          
+          // ترتيب السجل محلياً (الأحدث أولاً) لتجنب الحاجة لإنشاء Index في البداية
+          history.sort((a, b) => b.updatedAt - a.updatedAt);
+          
           setChatHistory(history);
         }, (error) => {
-           console.error("Firestore Error:", error);
-           // Don't show error to user immediately to avoid annoyance
+           console.error("Firestore Read Error:", error);
+           if (error.code === 'permission-denied') {
+             showNotification("تنبيه: يرجى تسجيل الخروج ثم الدخول مرة أخرى لتحديث صلاحيات قراءة السجل.", "error");
+           }
         });
         return () => unsubscribeChats();
       } else {
@@ -113,7 +121,7 @@ function App() {
 
   const handleGoogleLogin = async () => {
     if (!isFirebaseInitialized || !auth || !googleProvider) {
-      showNotification("يرجى إعداد مفاتيح Firebase في ملف .env لتفعيل تسجيل الدخول.", "error");
+      showNotification("يرجى إعداد مفاتيح Firebase لتفعيل تسجيل الدخول.", "error");
       return;
     }
     
@@ -124,8 +132,10 @@ function App() {
       console.error("Login failed", error);
       if (error.code === 'auth/popup-closed-by-user') {
         // User closed popup, ignore
+      } else if (error.code === 'auth/unauthorized-domain') {
+         showNotification(`النطاق غير مصرح به. انسخ هذا الرابط وأضفه في Firebase Console (Auth -> Settings -> Authorized domains): ${window.location.hostname}`, "error");
       } else {
-        showNotification("فشل تسجيل الدخول. تحقق من الاتصال أو إعدادات Firebase.", "error");
+        showNotification(`فشل تسجيل الدخول: ${error.message}`, "error");
       }
     }
   };
@@ -206,9 +216,22 @@ function App() {
           updatedAt: Date.now()
         });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving to Firestore:", error);
-      showNotification("حدث خطأ أثناء حفظ المحادثة في السحابة.", "error");
+      
+      let errorMsg = `خطأ في الحفظ (${error.code})`;
+      
+      if (error.code === 'permission-denied') {
+        errorMsg = "تنبيه أمني: يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى لتفعيل القواعد الجديدة.";
+      } else if (error.code === 'unimplemented' || error.message.includes('NOT_FOUND')) {
+        errorMsg = "قاعدة البيانات غير موجودة! يرجى إنشاؤها في Firebase Console.";
+      } else if (error.code === 'resource-exhausted') {
+        errorMsg = "تم تجاوز حد الاستخدام المجاني لقاعدة البيانات.";
+      } else if (error.code === 'unavailable') {
+         errorMsg = "لا يوجد اتصال بالخادم (Offline). تأكد من الإنترنت.";
+      }
+      
+      showNotification(errorMsg, "error");
     }
   };
 
