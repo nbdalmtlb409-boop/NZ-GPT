@@ -70,37 +70,8 @@ function App() {
 
   const handleSendMessage = async (textOverride?: string) => {
     if (!isOnline) return;
-    
-    // --- منطق الإعلان الصارم (كل 6 دقائق) ---
-    try {
-      // نستخدم مفتاحاً جديداً لضمان عدم تداخل التخزين القديم
-      const STORAGE_KEY = 'nz_gpt_timer_v2'; 
-      const COOLDOWN_MS = 6 * 60 * 1000; // 6 دقائق بالميلي ثانية
-      
-      const now = Date.now();
-      const lastShownStr = localStorage.getItem(STORAGE_KEY);
-      const lastShown = lastShownStr ? parseInt(lastShownStr) : 0;
 
-      // الشرط: إذا لم يظهر أبداً (0) أو مرت 6 دقائق منذ آخر ظهور
-      if (lastShown === 0 || (now - lastShown > COOLDOWN_MS)) {
-        
-        // 1. تحديث المؤقت فوراً لمنع التكرار
-        localStorage.setItem(STORAGE_KEY, now.toString());
-        
-        // 2. حقن السكربت
-        console.log('NZ GPT: Ad Timer Expired. Injecting Ad Script.');
-        const script = document.createElement('script');
-        script.src = "https://pl28591749.effectivegatecpm.com/57/e0/a8/57e0a890f94e142c034f01797d447fec.js";
-        script.async = true;
-        document.body.appendChild(script);
-      } else {
-        const remainingMinutes = Math.ceil((COOLDOWN_MS - (now - lastShown)) / 60000);
-        console.log(`NZ GPT: Ad is in cooldown. Next ad in approx ${remainingMinutes} minutes.`);
-      }
-    } catch (e) {
-      console.error("Ad injection logic error", e);
-    }
-    // ------------------------------------------
+    // تم حذف منطق إعلان البوبندر من هنا بناءً على طلب المستخدم
 
     const textToSend = textOverride || inputText;
     if ((!textToSend.trim() && !selectedImage) || isLoading || isStreaming) return;
