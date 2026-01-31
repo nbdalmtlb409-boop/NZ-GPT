@@ -32,16 +32,15 @@ export const sendMessageToNZGPT = async (
   currentImageBase64?: string,
   signal?: AbortSignal
 ): Promise<string> => {
-  // التحقق من وجود مفتاح API
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key is missing. Please check environment settings.");
-  }
-
   try {
-    const ai = new GoogleGenAI({ apiKey });
-    // استخدام موديل فلاش 2.5 للسرعة وكفاءة التكلفة
-    const modelName = 'gemini-2.5-flash';
+    const apiKey = process.env.API_KEY;
+    if (!apiKey || apiKey === 'undefined' || apiKey === '') {
+       throw new Error("API Key is missing. Please add API_KEY to your environment variables.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: apiKey });
+    // استخدام موديل فلاش 3 للمعالجة النصية السريعة
+    const modelName = 'gemini-3-flash-preview';
 
     // نأخذ آخر 5 رسائل فقط من السجل للحفاظ على التناسق والأداء
     const recentHistory = history.slice(-5);
