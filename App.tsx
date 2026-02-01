@@ -191,12 +191,13 @@ function App() {
     }
   };
 
-  const saveChatToFirebase = async (updatedMessages: Message[], newMsgText: string) => {
+  // تعديل الدالة لتقبل ID اختياري ولترجع ID المحادثة
+  const saveChatToFirebase = async (updatedMessages: Message[], newMsgText: string, chatIdOverride?: string | null): Promise<string | null> => {
     // Only save if we have a real user and DB
-    if (!user || isGuest) return;
-    if (!db) return;
+    if (!user || isGuest) return null;
+    if (!db) return null;
 
-    // تنظيف البيانات: Firebase لا يقبل undefined، لذلك نحذف الخاصية أو نستخدم null
+    // تنظيف البيانات
     const sanitizedMessages = updatedMessages.map(msg => {
         const cleanMsg: any = { 
             id: msg.id,
@@ -204,32 +205,35 @@ function App() {
             text: msg.text,
             timestamp: msg.timestamp
         };
-        // نضيف الصورة فقط إذا كانت موجودة ولها قيمة
         if (msg.image) {
             cleanMsg.image = msg.image;
         }
         return cleanMsg;
     });
 
+    const targetChatId = chatIdOverride || currentChatId;
+
     try {
-      if (!currentChatId) {
+      if (!targetChatId) {
         // Create new chat document in Firestore
         const title = newMsgText.length > 30 ? newMsgText.substring(0, 30) + "..." : newMsgText;
         const docRef = await addDoc(collection(db, "chats"), {
           userId: user.uid,
           title: title,
-          messages: sanitizedMessages, // نستخدم البيانات المنظفة
+          messages: sanitizedMessages,
           createdAt: Date.now(),
           updatedAt: Date.now()
         });
         setCurrentChatId(docRef.id);
+        return docRef.id; // نرجع الـ ID الجديد
       } else {
         // Update existing chat in Firestore
-        const chatRef = doc(db, "chats", currentChatId);
+        const chatRef = doc(db, "chats", targetChatId);
         await updateDoc(chatRef, {
-          messages: sanitizedMessages, // نستخدم البيانات المنظفة
+          messages: sanitizedMessages,
           updatedAt: Date.now()
         });
+        return targetChatId; // نرجع الـ ID الحالي
       }
     } catch (error: any) {
       console.error("Error saving to Firestore:", error);
@@ -249,6 +253,7 @@ function App() {
       }
       
       showNotification(errorMsg, "error");
+      return null;
     }
   };
 
@@ -279,8 +284,18 @@ function App() {
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
 
+    // متغير محلي لتتبع ID المحادثة أثناء تنفيذ الدالة
+    let activeChatId = currentChatId;
+
     // Optimistic Save (Initial user message)
-    if (user && !isGuest) saveChatToFirebase(updatedMessages, textToSend);
+    if (user && !isGuest) {
+        // ننتظر الحصول على ID المحادثة (سواء جديد أو موجود)
+        const savedId = await saveChatToFirebase(updatedMessages, textToSend, activeChatId);
+        if (savedId) {
+            activeChatId = savedId;
+            setCurrentChatId(savedId); // تحديث الحالة أيضاً
+        }
+    }
 
     try {
       const botMsgId = (Date.now() + 100).toString();
@@ -308,7 +323,8 @@ function App() {
       // Final Save (Include Bot Response)
       if (user && !isGuest) {
         const messagesWithBot = [...updatedMessages, { id: botMsgId, role: Role.MODEL, text: finalBotText, timestamp: Date.now() }];
-        saveChatToFirebase(messagesWithBot, textToSend);
+        // نستخدم activeChatId الذي تم تأكيده في الخطوة الأولى
+        await saveChatToFirebase(messagesWithBot, textToSend, activeChatId);
       }
 
     } catch (error: any) {
