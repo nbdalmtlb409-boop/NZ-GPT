@@ -196,6 +196,21 @@ function App() {
     if (!user || isGuest) return;
     if (!db) return;
 
+    // تنظيف البيانات: Firebase لا يقبل undefined، لذلك نحذف الخاصية أو نستخدم null
+    const sanitizedMessages = updatedMessages.map(msg => {
+        const cleanMsg: any = { 
+            id: msg.id,
+            role: msg.role,
+            text: msg.text,
+            timestamp: msg.timestamp
+        };
+        // نضيف الصورة فقط إذا كانت موجودة ولها قيمة
+        if (msg.image) {
+            cleanMsg.image = msg.image;
+        }
+        return cleanMsg;
+    });
+
     try {
       if (!currentChatId) {
         // Create new chat document in Firestore
@@ -203,7 +218,7 @@ function App() {
         const docRef = await addDoc(collection(db, "chats"), {
           userId: user.uid,
           title: title,
-          messages: updatedMessages,
+          messages: sanitizedMessages, // نستخدم البيانات المنظفة
           createdAt: Date.now(),
           updatedAt: Date.now()
         });
@@ -212,23 +227,25 @@ function App() {
         // Update existing chat in Firestore
         const chatRef = doc(db, "chats", currentChatId);
         await updateDoc(chatRef, {
-          messages: updatedMessages,
+          messages: sanitizedMessages, // نستخدم البيانات المنظفة
           updatedAt: Date.now()
         });
       }
     } catch (error: any) {
       console.error("Error saving to Firestore:", error);
       
-      let errorMsg = `خطأ في الحفظ (${error.code})`;
+      let errorMsg = `خطأ في الحفظ (${error.code || 'Unknown'})`;
       
       if (error.code === 'permission-denied') {
         errorMsg = "تنبيه أمني: يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى لتفعيل القواعد الجديدة.";
-      } else if (error.code === 'unimplemented' || error.message.includes('NOT_FOUND')) {
+      } else if (error.code === 'unimplemented' || (error.message && error.message.includes('NOT_FOUND'))) {
         errorMsg = "قاعدة البيانات غير موجودة! يرجى إنشاؤها في Firebase Console.";
       } else if (error.code === 'resource-exhausted') {
         errorMsg = "تم تجاوز حد الاستخدام المجاني لقاعدة البيانات.";
       } else if (error.code === 'unavailable') {
          errorMsg = "لا يوجد اتصال بالخادم (Offline). تأكد من الإنترنت.";
+      } else if (error.message && error.message.includes('Invalid argument')) {
+          errorMsg = "بيانات غير صالحة. تم الإصلاح تلقائياً، حاول مرة أخرى.";
       }
       
       showNotification(errorMsg, "error");
