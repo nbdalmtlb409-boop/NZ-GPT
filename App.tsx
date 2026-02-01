@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, StopCircle, Sparkles, Trash2, LogIn, LogOut, Menu, Plus, MessageSquare, History, AlertTriangle, User as UserIcon, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, Paperclip, X, StopCircle, Sparkles, Trash2, LogIn, LogOut, Menu, Plus, MessageSquare, History, AlertTriangle, User as UserIcon, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
 import { Message, Role, ChatSession } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
@@ -8,7 +8,7 @@ import MessageItem from './components/MessageItem';
 // Firebase Imports
 import { auth, googleProvider, db, isFirebaseInitialized } from './firebaseConfig';
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
-import { collection, addDoc, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 
 function App() {
   // Authentication State
@@ -20,9 +20,12 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // UI State - Dropdowns
+  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
 
-  // UI State
+  // UI State - General
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,11 +40,12 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const historyDropdownRef = useRef<HTMLDivElement>(null);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   // Helper to show notification
   const showNotification = (message: string, type: 'error' | 'success' = 'error') => {
     setNotification({ message, type });
-    // زيادة الوقت لقراءة رسائل الخطأ بشكل أفضل (10 ثواني للخطأ)
     const duration = type === 'error' ? 10000 : 4000;
     setTimeout(() => setNotification(null), duration);
   };
@@ -70,9 +74,7 @@ function App() {
             ...doc.data()
           } as ChatSession));
           
-          // ترتيب السجل محلياً (الأحدث أولاً) لتجنب الحاجة لإنشاء Index في البداية
           history.sort((a, b) => b.updatedAt - a.updatedAt);
-          
           setChatHistory(history);
         }, (error) => {
            console.error("Firestore Read Error:", error);
@@ -117,6 +119,20 @@ function App() {
     }
   }, [messages, isLoading]);
 
+  // --- Click Outside Handlers for Dropdowns ---
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (historyDropdownRef.current && !historyDropdownRef.current.contains(event.target as Node)) {
+        setShowHistoryDropdown(false);
+      }
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // --- Handlers ---
 
   const handleGoogleLogin = async () => {
@@ -127,13 +143,11 @@ function App() {
     
     try {
       await signInWithPopup(auth, googleProvider);
-      // Success is handled by onAuthStateChanged
     } catch (error: any) {
       console.error("Login failed", error);
       if (error.code === 'auth/popup-closed-by-user') {
-        // User closed popup, ignore
       } else if (error.code === 'auth/unauthorized-domain') {
-         showNotification(`النطاق غير مصرح به. انسخ هذا الرابط وأضفه في Firebase Console (Auth -> Settings -> Authorized domains): ${window.location.hostname}`, "error");
+         showNotification(`النطاق غير مصرح به.`, "error");
       } else {
         showNotification(`فشل تسجيل الدخول: ${error.message}`, "error");
       }
@@ -150,7 +164,7 @@ function App() {
     };
     setIsGuest(true);
     setUser(guestUser);
-    setChatHistory([]); // Guests start empty
+    setChatHistory([]);
   };
 
   const handleLogout = async () => {
@@ -163,20 +177,38 @@ function App() {
         setMessages([]);
         setChatHistory([]);
       }
+      setShowProfileDropdown(false);
     }
   };
 
   const createNewChat = () => {
     setMessages([]);
     setCurrentChatId(null);
-    setIsSidebarOpen(false);
     if (textareaRef.current) textareaRef.current.focus();
   };
 
   const loadChat = (session: ChatSession) => {
     setCurrentChatId(session.id);
     setMessages(session.messages);
-    setIsSidebarOpen(false);
+    setShowHistoryDropdown(false);
+  };
+
+  const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation();
+    if (!window.confirm("هل أنت متأكد من حذف هذه المحادثة؟")) return;
+
+    if (!db || !user || isGuest) return;
+
+    try {
+        await deleteDoc(doc(db, "chats", chatId));
+        if (currentChatId === chatId) {
+            createNewChat();
+        }
+        showNotification("تم حذف المحادثة بنجاح", "success");
+    } catch (error: any) {
+        console.error("Delete error:", error);
+        showNotification("حدث خطأ أثناء الحذف", "error");
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,13 +223,10 @@ function App() {
     }
   };
 
-  // تعديل الدالة لتقبل ID اختياري ولترجع ID المحادثة
   const saveChatToFirebase = async (updatedMessages: Message[], newMsgText: string, chatIdOverride?: string | null): Promise<string | null> => {
-    // Only save if we have a real user and DB
     if (!user || isGuest) return null;
     if (!db) return null;
 
-    // تنظيف البيانات
     const sanitizedMessages = updatedMessages.map(msg => {
         const cleanMsg: any = { 
             id: msg.id,
@@ -215,7 +244,6 @@ function App() {
 
     try {
       if (!targetChatId) {
-        // Create new chat document in Firestore
         const title = newMsgText.length > 30 ? newMsgText.substring(0, 30) + "..." : newMsgText;
         const docRef = await addDoc(collection(db, "chats"), {
           userId: user.uid,
@@ -225,34 +253,17 @@ function App() {
           updatedAt: Date.now()
         });
         setCurrentChatId(docRef.id);
-        return docRef.id; // نرجع الـ ID الجديد
+        return docRef.id;
       } else {
-        // Update existing chat in Firestore
         const chatRef = doc(db, "chats", targetChatId);
         await updateDoc(chatRef, {
           messages: sanitizedMessages,
           updatedAt: Date.now()
         });
-        return targetChatId; // نرجع الـ ID الحالي
+        return targetChatId;
       }
     } catch (error: any) {
       console.error("Error saving to Firestore:", error);
-      
-      let errorMsg = `خطأ في الحفظ (${error.code || 'Unknown'})`;
-      
-      if (error.code === 'permission-denied') {
-        errorMsg = "تنبيه أمني: يرجى تسجيل الخروج ثم تسجيل الدخول مرة أخرى لتفعيل القواعد الجديدة.";
-      } else if (error.code === 'unimplemented' || (error.message && error.message.includes('NOT_FOUND'))) {
-        errorMsg = "قاعدة البيانات غير موجودة! يرجى إنشاؤها في Firebase Console.";
-      } else if (error.code === 'resource-exhausted') {
-        errorMsg = "تم تجاوز حد الاستخدام المجاني لقاعدة البيانات.";
-      } else if (error.code === 'unavailable') {
-         errorMsg = "لا يوجد اتصال بالخادم (Offline). تأكد من الإنترنت.";
-      } else if (error.message && error.message.includes('Invalid argument')) {
-          errorMsg = "بيانات غير صالحة. تم الإصلاح تلقائياً، حاول مرة أخرى.";
-      }
-      
-      showNotification(errorMsg, "error");
       return null;
     }
   };
@@ -266,7 +277,6 @@ function App() {
     const textToSend = textOverride || inputText;
     if ((!textToSend.trim() && !selectedImage) || isLoading || isStreaming) return;
 
-    // 1. Add User Message
     const userMsg: Message = {
       id: Date.now().toString(),
       role: Role.USER,
@@ -284,16 +294,13 @@ function App() {
     setIsLoading(true);
     abortControllerRef.current = new AbortController();
 
-    // متغير محلي لتتبع ID المحادثة أثناء تنفيذ الدالة
     let activeChatId = currentChatId;
 
-    // Optimistic Save (Initial user message)
     if (user && !isGuest) {
-        // ننتظر الحصول على ID المحادثة (سواء جديد أو موجود)
         const savedId = await saveChatToFirebase(updatedMessages, textToSend, activeChatId);
         if (savedId) {
             activeChatId = savedId;
-            setCurrentChatId(savedId); // تحديث الحالة أيضاً
+            setCurrentChatId(savedId);
         }
     }
 
@@ -320,10 +327,8 @@ function App() {
         abortControllerRef.current.signal
       );
 
-      // Final Save (Include Bot Response)
       if (user && !isGuest) {
         const messagesWithBot = [...updatedMessages, { id: botMsgId, role: Role.MODEL, text: finalBotText, timestamp: Date.now() }];
-        // نستخدم activeChatId الذي تم تأكيده في الخطوة الأولى
         await saveChatToFirebase(messagesWithBot, textToSend, activeChatId);
       }
 
@@ -351,7 +356,6 @@ function App() {
   if (!user) {
     return (
       <div className="flex flex-col h-screen w-screen bg-[#212121] items-center justify-center p-6 relative overflow-hidden">
-        {/* Notification Toast */}
         {notification && (
           <div className={`absolute top-10 right-1/2 translate-x-1/2 md:translate-x-0 md:right-10 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-2xl animate-in slide-in-from-top-5 fade-in ${
               notification.type === 'error' ? 'bg-red-500/10 border border-red-500/50 text-red-200' : 'bg-green-500/10 border border-green-500/50 text-green-200'
@@ -361,7 +365,6 @@ function App() {
           </div>
         )}
 
-        {/* Background Elements */}
         <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
           <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-500/10 rounded-full blur-[100px]"></div>
           <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[100px]"></div>
@@ -373,12 +376,9 @@ function App() {
           </div>
           
           <h1 className="text-3xl font-black text-white mb-2 tracking-tighter">NZ GPT PRO</h1>
-          <p className="text-gray-400 mb-8 font-medium">
-             نظام المحادثة الذكي المتطور للمطورين والمحترفين
-          </p>
+          <p className="text-gray-400 mb-8 font-medium">نظام المحادثة الذكي المتطور</p>
           
           <div className="flex flex-col gap-3 w-full">
-            {/* Google Login */}
             <button 
               onClick={handleGoogleLogin}
               className="w-full bg-white text-gray-900 font-bold py-3.5 px-6 rounded-2xl flex items-center justify-center gap-3 transition-all transform shadow-xl hover:bg-gray-50 active:scale-95"
@@ -391,8 +391,6 @@ function App() {
               </svg>
               المتابعة باستخدام Google
             </button>
-
-            {/* Guest Login */}
             <button 
               onClick={handleGuestLogin}
               className="w-full font-bold py-3.5 px-6 rounded-2xl flex items-center justify-center gap-3 transition-all transform active:scale-95 bg-white/5 hover:bg-white/10 text-white border border-white/10"
@@ -401,10 +399,6 @@ function App() {
               تجربة كزائر
             </button>
           </div>
-
-          <p className="mt-6 text-xs text-gray-600">
-            عند الدخول كزائر لن يتم حفظ المحادثات في حسابك.
-          </p>
         </div>
       </div>
     );
@@ -412,9 +406,8 @@ function App() {
 
   // --- Render: Main App ---
   return (
-    <div className="flex h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative">
+    <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative">
       
-       {/* In-App Notification */}
        {notification && (
           <div className={`absolute top-20 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-2 px-4 py-2 rounded-full shadow-xl animate-in fade-in slide-in-from-top-2 ${
               notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'
@@ -424,136 +417,119 @@ function App() {
           </div>
         )}
 
-      {/* Sidebar Overlay (Mobile) */}
-      {isSidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
-          onClick={() => setIsSidebarOpen(false)}
-        />
-      )}
+        {/* 
+            HEADER 
+            Note: flex-row-reverse is used here to enforce Visual Left-to-Right order even in RTL:
+            Visual Left: Connection -> History -> New Chat -> Profile : Visual Right
+        */}
+        <header className="flex flex-row-reverse items-center justify-between px-4 py-3 bg-[#171717] border-b border-white/5 shrink-0 z-50">
+            
+            {/* Visual Left Group: Connection & History */}
+            <div className="flex items-center gap-4">
+                {/* 1. Connection Status */}
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/10" title={isOnline ? 'متصل' : 'غير متصل'}>
+                    <div className={`w-2 h-2 rounded-full shadow-[0_0_8px] ${isOnline ? 'bg-green-500 shadow-green-500/60' : 'bg-red-500 shadow-red-500/60'} animate-pulse`}></div>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest hidden sm:block">{isOnline ? 'متصل' : 'غير متصل'}</span>
+                </div>
 
-      {/* Sidebar */}
-      <aside className={`
-        fixed md:relative inset-y-0 right-0 z-50 w-72 bg-[#171717] border-l border-white/5 flex flex-col transition-transform duration-300 ease-in-out
-        ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'}
-        md:w-64 lg:w-72 shrink-0
-      `}>
-        
-        {/* Sidebar Header */}
-        <div className="p-4 border-b border-white/5 flex items-center justify-between">
-           <div className="flex items-center gap-2">
-             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-               <Sparkles size={16} className="text-white" />
-             </div>
-             <h2 className="font-bold text-lg tracking-tight">NZ GPT</h2>
-           </div>
-           <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-gray-400">
-             <X size={20} />
-           </button>
-        </div>
+                {/* 2. History Button & Dropdown */}
+                <div className="relative" ref={historyDropdownRef}>
+                    <button 
+                        onClick={() => setShowHistoryDropdown(!showHistoryDropdown)}
+                        className={`p-2 rounded-xl transition-all ${showHistoryDropdown ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
+                        title="السجل"
+                    >
+                        <History size={20} />
+                    </button>
 
-        {/* New Chat Button */}
-        <div className="p-4">
-          <button 
-            onClick={createNewChat}
-            className="w-full flex items-center gap-3 bg-white/5 hover:bg-white/10 border border-white/5 text-white p-3 rounded-xl transition-all active:scale-95 group"
-          >
-            <div className="bg-emerald-500/20 p-1.5 rounded-lg text-emerald-500 group-hover:text-emerald-400 group-hover:bg-emerald-500/30 transition-colors">
-              <Plus size={18} />
+                    {/* Dropdown Menu */}
+                    {showHistoryDropdown && (
+                        <div className="absolute top-full left-0 mt-2 w-72 max-h-[70vh] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl overflow-y-auto z-[100] animate-in fade-in zoom-in-95 duration-200">
+                             <div className="p-3 border-b border-white/5 sticky top-0 bg-[#1a1a1a] z-10 flex justify-between items-center">
+                                 <span className="text-xs font-bold text-gray-400 uppercase">المحادثات السابقة</span>
+                                 {isGuest && <span className="text-[10px] text-amber-500 flex items-center gap-1"><AlertTriangle size={10}/> زائر</span>}
+                             </div>
+                             
+                             {isGuest ? (
+                                <div className="p-8 text-center opacity-40">
+                                    <AlertTriangle size={24} className="mx-auto mb-2" />
+                                    <p className="text-xs">السجل غير متاح للزوار</p>
+                                </div>
+                             ) : chatHistory.length === 0 ? (
+                                <div className="p-8 text-center opacity-40">
+                                    <History size={24} className="mx-auto mb-2" />
+                                    <p className="text-xs">لا يوجد سجل</p>
+                                </div>
+                             ) : (
+                                <div className="p-2 space-y-1">
+                                    {chatHistory.map(chat => (
+                                        <div key={chat.id} className="relative group flex items-center gap-2 p-2 rounded-lg hover:bg-white/5 cursor-pointer" onClick={() => loadChat(chat)}>
+                                            <MessageSquare size={14} className="text-emerald-500 shrink-0" />
+                                            <span className="text-sm text-gray-300 truncate flex-1 text-right">{chat.title}</span>
+                                            <button 
+                                                onClick={(e) => handleDeleteChat(e, chat.id)}
+                                                className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded opacity-0 group-hover:opacity-100 transition-all"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                             )}
+                        </div>
+                    )}
+                </div>
             </div>
-            <span className="font-medium">محادثة جديدة</span>
-          </button>
-        </div>
 
-        {/* Chat History List */}
-        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-          <h3 className="px-4 text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 mt-2">السجل {isGuest ? '(زائر)' : ''}</h3>
-          {isGuest ? (
-             <div className="text-center py-10 opacity-30 flex flex-col items-center">
-               <AlertTriangle size={32} className="mb-2 text-amber-500" />
-               <span className="text-xs">السجل متاح فقط للأعضاء</span>
-             </div>
-          ) : chatHistory.length === 0 ? (
-             <div className="text-center py-10 opacity-30 flex flex-col items-center">
-               <History size={32} className="mb-2" />
-               <span className="text-xs">لا توجد محادثات سابقة</span>
-             </div>
-          ) : (
-            chatHistory.map(chat => (
-              <button
-                key={chat.id}
-                onClick={() => loadChat(chat)}
-                className={`w-full text-right p-3 rounded-xl text-sm flex items-center gap-3 transition-all group ${currentChatId === chat.id ? 'bg-white/10 text-white font-medium' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}
-              >
-                <MessageSquare size={16} className={currentChatId === chat.id ? 'text-emerald-500' : 'text-gray-600'} />
-                <span className="truncate flex-1">{chat.title || 'محادثة بدون عنوان'}</span>
-              </button>
-            ))
-          )}
-        </div>
+            {/* Visual Right Group: New Chat & Profile */}
+            <div className="flex items-center gap-4">
+                 {/* 3. New Chat */}
+                 <button 
+                    onClick={createNewChat}
+                    className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-900/20"
+                 >
+                    <Plus size={18} />
+                    <span className="text-sm font-bold hidden sm:inline">محادثة جديدة</span>
+                 </button>
 
-        {/* User Profile Footer */}
-        <div className="p-4 bg-[#1a1a1a] border-t border-white/5">
-          <div className="flex items-center gap-3 mb-3">
-            <img 
-              src={user.photoURL || "https://ui-avatars.com/api/?name=" + (isGuest ? "Guest" : user.displayName) + "&background=random"} 
-              alt="Profile" 
-              className="w-10 h-10 rounded-full border border-white/10"
-            />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">{user.displayName || "مستخدم"}</p>
-              <p className="text-xs text-gray-500 truncate">{isGuest ? "حساب زائر" : user.email}</p>
+                 {/* 4. Profile & Dropdown */}
+                 <div className="relative" ref={profileDropdownRef}>
+                    <button 
+                        onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                        className="flex items-center gap-2 focus:outline-none group"
+                    >
+                        <img 
+                            src={user.photoURL || "https://ui-avatars.com/api/?name=" + (isGuest ? "Guest" : user.displayName) + "&background=random"} 
+                            alt="Profile" 
+                            className={`w-9 h-9 rounded-full border-2 transition-all ${showProfileDropdown ? 'border-emerald-500' : 'border-white/10 group-hover:border-white/30'}`}
+                        />
+                    </button>
+
+                    {/* Profile Dropdown */}
+                    {showProfileDropdown && (
+                        <div className="absolute top-full right-0 mt-2 w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-[100] animate-in fade-in zoom-in-95 duration-200">
+                            <div className="p-4 border-b border-white/5">
+                                <p className="text-sm font-bold text-white truncate">{user.displayName || "مستخدم"}</p>
+                                <p className="text-xs text-gray-500 truncate mt-0.5">{isGuest ? "حساب زائر" : user.email}</p>
+                            </div>
+                            <div className="p-1">
+                                <button 
+                                    onClick={handleLogout}
+                                    className="w-full flex items-center gap-2 p-2.5 text-sm text-red-400 hover:bg-red-500/10 rounded-lg transition-colors text-right"
+                                >
+                                    <LogOut size={16} />
+                                    <span>تسجيل الخروج</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                 </div>
             </div>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-2 text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 py-2.5 rounded-lg text-xs font-bold transition-colors"
-          >
-            <LogOut size={14} />
-            تسجيل الخروج
-          </button>
-        </div>
-      </aside>
 
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#212121] relative">
-        
-        {/* Header */}
-        <header className="h-16 flex items-center justify-between px-4 md:px-6 bg-[#212121]/95 z-30 border-b border-white/5 shrink-0 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 -mr-2 text-gray-400 hover:text-white"
-            >
-              <Menu size={24} />
-            </button>
-            <h1 className="font-black text-xl tracking-tighter md:hidden">NZ GPT</h1>
-            <span className="hidden md:block font-bold text-gray-500 text-sm">
-              {currentChatId ? 'محادثة الحالية' : 'محادثة جديدة'}
-            </span>
-          </div>
-          
-          <div className="flex items-center gap-4">
-              {messages.length > 0 && (
-                <button 
-                  onClick={createNewChat} 
-                  className="p-2 text-gray-500 hover:text-red-500 transition-colors active:scale-90"
-                  title="مسح الشاشة (محادثة جديدة)"
-                >
-                  <Trash2 size={18} />
-                </button>
-              )}
-              
-              <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
-                <div className={`w-1.5 h-1.5 rounded-full shadow-[0_0_8px] ${isOnline ? 'bg-green-500 shadow-green-500/60' : 'bg-red-500 shadow-red-500/60'} animate-pulse`}></div>
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{isOnline ? 'متصل' : 'غير متصل'}</span>
-              </div>
-          </div>
         </header>
 
-        {/* Chat Area */}
-        <main className="flex-1 overflow-y-auto w-full selection:bg-emerald-500/30">
+      {/* Chat Area */}
+      <main className="flex-1 overflow-y-auto w-full selection:bg-emerald-500/30">
           {messages.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-500">
                 <div className="w-20 h-20 mb-8 bg-white/5 rounded-[32px] flex items-center justify-center text-white/10 shadow-inner -rotate-6 border border-white/5">
@@ -587,10 +563,10 @@ function App() {
               <div ref={messagesEndRef} />
             </div>
           )}
-        </main>
+      </main>
 
-        {/* Adsterra Banner */}
-        <div 
+      {/* Adsterra Banner */}
+      <div 
           key={adRefreshKey}
           className="w-full flex justify-center bg-[#212121] py-1 shrink-0 border-t border-white/5"
           dangerouslySetInnerHTML={{ __html: `
@@ -603,10 +579,10 @@ function App() {
               frameborder="0"
             ></iframe>
           `}} 
-        />
+      />
 
-        {/* Input Area */}
-        <div className="bg-[#212121] border-t border-white/5 p-4 safe-pb z-40 relative">
+      {/* Input Area */}
+      <div className="bg-[#212121] border-t border-white/5 p-4 safe-pb z-40 relative">
           <div className="max-w-3xl mx-auto relative">
             
             {selectedImage && (
@@ -668,8 +644,6 @@ function App() {
                <p className="text-[8px] text-gray-600 font-bold tracking-[2px] uppercase opacity-40">NZ GPT PRO</p>
             </div>
           </div>
-        </div>
-
       </div>
 
     </div>
