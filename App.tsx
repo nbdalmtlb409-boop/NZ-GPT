@@ -32,9 +32,10 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   
-  // Notifications
+  // Notifications & Ads
   const [notification, setNotification] = useState<{message: string, type: 'error' | 'success'} | null>(null);
   const [adRefreshKey, setAdRefreshKey] = useState(0);
+  const [messageCountForAds, setMessageCountForAds] = useState(0); // عداد للرسائل لتحديث الإعلان
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,14 +103,6 @@ function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, []);
-
-  // --- Ad Timer ---
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setAdRefreshKey(prev => prev + 1);
-    }, 30000); 
-    return () => clearInterval(interval);
   }, []);
 
   // --- Auto Scroll ---
@@ -276,6 +269,17 @@ function App() {
 
     const textToSend = textOverride || inputText;
     if ((!textToSend.trim() && !selectedImage) || isLoading || isStreaming) return;
+
+    // زيادة عداد الرسائل
+    const nextMsgCount = messageCountForAds + 1;
+    setMessageCountForAds(nextMsgCount);
+    
+    // تحديث إعلان البانر كل 3 رسائل
+    if (nextMsgCount % 3 === 0) {
+       setAdRefreshKey(prev => prev + 1);
+    }
+
+    // --- تم إلغاء منطق Smart Link بناءً على طلبك ---
 
     const userMsg: Message = {
       id: Date.now().toString(),
