@@ -1,8 +1,9 @@
 
 import React from 'react';
 import { Message, Role } from '../types';
-import { ExternalLink, Sparkles, User } from 'lucide-react';
+import { ExternalLink, User } from 'lucide-react';
 import CodeBlock from './CodeBlock';
+import { BrandLogo } from '../App';
 
 interface MessageItemProps {
   message: Message;
@@ -73,39 +74,20 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   return (
     <div className={`w-full py-10 px-4 md:px-6 border-b border-white/[0.03] animate-in fade-in slide-in-from-bottom-2 duration-300`}>
       <div className="max-w-3xl mx-auto flex gap-4 md:gap-6 items-start">
-        
-        {/* Avatar */}
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border shadow-md ${
-          isUser ? 'bg-[#3f3f3f] border-white/10 text-white' : 'bg-emerald-600 border-emerald-500/20 text-white shadow-emerald-900/20'
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border shadow-md overflow-hidden ${
+          isUser ? 'bg-[#3f3f3f] border-white/10 text-white' : 'bg-transparent border-emerald-500/20'
         }`}>
-          {isUser ? <User size={18} /> : <Sparkles size={18} fill="currentColor" />}
+          {isUser ? <User size={20} /> : <BrandLogo className="w-full h-full" />}
         </div>
-
-        {/* Text Content Area */}
         <div className="flex-1 min-w-0 pt-0.5">
-          <p className="text-[10px] font-black uppercase tracking-[1.5px] text-gray-500 mb-2.5">
-            {isUser ? 'أنت' : 'NZ GPT PRO'}
-          </p>
-          
-          <div className="text-[15px] selection:bg-blue-500/30">
-            {message.image && (
-              <div className="mb-5 rounded-[20px] overflow-hidden border border-white/10 shadow-2xl inline-block">
-                <img src={message.image} alt="Upload" className="max-w-full h-auto max-h-[400px] object-contain" />
-              </div>
-            )}
-            
-            <div className="overflow-x-auto overflow-y-hidden">
-              {isUser ? (
-                <p className="whitespace-pre-wrap text-gray-100 leading-relaxed">{message.text}</p>
-              ) : (
-                <div className="prose prose-invert max-w-none prose-sm md:prose-base">
-                  {renderContent(message.text)}
-                </div>
-              )}
+          <p className="text-[11px] font-black uppercase tracking-[2px] text-gray-500 mb-3">{isUser ? 'أنت' : 'NZ GPT PRO'}</p>
+          <div className="text-[16px] selection:bg-emerald-500/20">
+            {message.image && <div className="mb-5 rounded-2xl overflow-hidden border border-white/10 shadow-2xl inline-block"><img src={message.image} alt="Upload" className="max-w-full h-auto max-h-[400px] object-contain" /></div>}
+            <div className="overflow-x-auto">
+              {isUser ? <p className="whitespace-pre-wrap text-gray-100 leading-relaxed font-medium">{message.text}</p> : <div className="prose prose-invert max-w-none">{renderContent(message.text)}</div>}
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

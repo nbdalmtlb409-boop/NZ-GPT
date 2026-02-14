@@ -13,43 +13,18 @@
     <title>NZ GPT PRO</title>
     <meta name="description" content="نظام محادثة ذكي متطور للمحترفين والمطورين، يقدم حلولاً برمجية وتحليلاً دقيقاً.">
     
+    <!-- Professional Favicon Data URL -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' rx='22' fill='%2310b981'/%3E%3Cpath d='M50 20C50 36.5 43.5 50 27 50C43.5 50 50 63.5 50 80C50 63.5 56.5 50 73 50C56.5 50 50 36.5 50 20Z' fill='white'/%3E%3Cpath d='M25 25V35M20 30H30' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M75 65V75M70 70H80' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+    
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:title" content="NZ GPT PRO">
     <meta property="og:description" content="نظام محادثة ذكي متطور للمحترفين والمطورين.">
-    <meta property="og:image" content="/nz-gpt-logo.png">
-    <meta property="og:site_name" content="NZ GPT PRO">
+    <meta property="og:image" content="data:image/svg+xml,%3Csvg viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' rx='22' fill='%2310b981'/%3E%3Cpath d='M50 20C50 36.5 43.5 50 27 50C43.5 50 50 63.5 50 80C50 63.5 56.5 50 73 50C56.5 50 50 36.5 50 20Z' fill='white'/%3E%3C/svg%3E">
 
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="NZ GPT PRO">
-    <meta name="twitter:description" content="نظام محادثة ذكي متطور للمحترفين والمطورين.">
-    <meta name="twitter:image" content="/nz-gpt-logo.png">
-    
-    <!-- Icons -->
-    <link rel="icon" href="/nz-gpt-logo.png" />
-    <link rel="apple-touch-icon" href="/nz-gpt-logo.png" />
-    
-    <!-- Social Bar Script (Official Way) -->
+    <!-- Social Bar Script -->
     <script src="https://pl28607884.effectivegatecpm.com/e3/f7/9f/e3f79fb9b5951a94b0a556c23f8d9494.js"></script>
 
-    <!-- معالج الأخطاء الفوري -->
-    <script>
-      window.onerror = function(msg, url, line, col, error) {
-        const loader = document.getElementById('initial-loader');
-        if (loader) loader.style.display = 'none';
-        
-        const errorBox = document.createElement('div');
-        errorBox.style.cssText = "position:fixed; inset:0; background:#000; color:#ff5555; z-index:10000; padding:20px; font-family:monospace; overflow:auto; direction:ltr; text-align:left; font-size:14px; white-space:pre-wrap;";
-        errorBox.innerHTML = "<h2 style='color:white'>Application Error</h2>" + msg + "\n\n" + (error && error.stack ? error.stack : "");
-        document.body.appendChild(errorBox);
-      };
-
-      // Polyfill بسيط لضمان وجود كائن process في بيئة المتصفح
-      window.process = window.process || { env: {} };
-    </script>
-
-    <!-- Tailwind CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -66,62 +41,15 @@
     </script>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@100..900&display=swap');
-      
-      * {
-        font-family: 'Noto Kufi Arabic', sans-serif;
-        -webkit-tap-highlight-color: transparent;
-        touch-action: manipulation;
-      }
-
-      body {
-        background-color: #212121;
-        margin: 0;
-        padding: 0;
-        height: 100dvh; 
-        width: 100vw;
-        overflow: hidden;
-        user-select: none;
-        -webkit-user-select: none;
-        overscroll-behavior: none;
-      }
-
-      #root {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-      }
-
-      #initial-loader {
-        position: fixed;
-        inset: 0;
-        background: #212121;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-        transition: opacity 0.5s ease;
-      }
-
-      .spinner {
-        width: 40px;
-        height: 40px;
-        border: 3px solid rgba(255,255,255,0.1);
-        border-top-color: #ffffff;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-
-      ::-webkit-scrollbar {
-        display: none;
-      }
-
-      .safe-pb {
-        padding-bottom: env(safe-area-inset-bottom, 16px);
+      * { font-family: 'Noto Kufi Arabic', sans-serif; -webkit-tap-highlight-color: transparent; }
+      body { background-color: #212121; margin: 0; padding: 0; height: 100dvh; width: 100vw; overflow: hidden; user-select: none; }
+      #root { height: 100%; display: flex; flex-direction: column; }
+      #initial-loader { position: fixed; inset: 0; background: #212121; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; transition: opacity 0.5s ease; }
+      .loader-logo { width: 90px; height: 90px; border-radius: 24px; animation: pulse-glow 2s infinite ease-in-out; }
+      @keyframes pulse-glow {
+        0% { transform: scale(0.95); filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.2)); }
+        50% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(16, 185, 129, 0.5)); }
+        100% { transform: scale(0.95); filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.2)); }
       }
     </style>
 <script type="importmap">
@@ -131,30 +59,30 @@
     "react": "https://esm.sh/react@^19.2.4",
     "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
     "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.2",
-    "vite": "https://esm.sh/vite@^7.3.1",
     "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
+    "firebase/": "https://esm.sh/firebase@^12.8.0/",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4",
+    "vite": "https://esm.sh/vite@^7.3.1"
   }
 }
 </script>
 </head>
   <body>
     <div id="initial-loader">
-      <div class="spinner"></div>
-      <p style="color: white; margin-top: 20px; font-weight: bold; font-size: 14px; letter-spacing: 2px;">NZ GPT PRO</p>
+      <svg class="loader-logo" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" rx="25" fill="#10b981"/>
+        <path d="M50 20C50 36.5 43.5 50 27 50C43.5 50 50 63.5 50 80C50 63.5 56.5 50 73 50C56.5 50 50 36.5 50 20Z" fill="white"/>
+        <path d="M25 25V35M20 30H30" stroke="white" stroke-width="4" stroke-linecap="round"/>
+        <path d="M75 65V75M70 70H80" stroke="white" stroke-width="4" stroke-linecap="round"/>
+      </svg>
+      <p style="color: white; margin-top: 24px; font-weight: 900; font-size: 18px; letter-spacing: 2px; text-shadow: 0 2px 10px rgba(0,0,0,0.5);">NZ GPT PRO</p>
     </div>
-    
     <div id="root"></div>
-
     <script type="module">
       window.addEventListener('load', () => {
         setTimeout(() => {
           const loader = document.getElementById('initial-loader');
-          if (loader) {
-            loader.style.opacity = '0';
-            setTimeout(() => loader.remove(), 500);
-          }
+          if (loader) { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }
         }, 1500);
       });
     </script>
