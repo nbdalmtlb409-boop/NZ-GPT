@@ -10,7 +10,7 @@ import { auth, googleProvider, db, isFirebaseInitialized } from './firebaseConfi
 import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
-// المكون الرسومي للوجو
+// المكون الرسومي للوجو لضمان الدقة
 export const BrandLogo = ({ className = "w-24 h-24" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="100" height="100" rx="25" fill="#10b981"/>
@@ -97,16 +97,6 @@ function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleGoogleLogin = async () => {
-    if (!isFirebaseInitialized || !auth || !googleProvider) return;
-    try { await signInWithPopup(auth, googleProvider); } catch (e) { showNotification("فشل تسجيل الدخول"); }
-  };
-
-  const handleGuestLogin = () => {
-    setUser({ uid: 'guest-' + Date.now(), displayName: 'زائر', email: 'guest@nzgpt.pro', photoURL: null });
-    setIsGuest(true);
-  };
-
   const handleLogout = async () => {
     if (window.confirm("هل أنت متأكد من تسجيل الخروج؟")) {
       if (auth && !isGuest) await signOut(auth);
@@ -176,8 +166,8 @@ function App() {
           <h1 className="text-4xl font-black text-white mb-2 tracking-tighter">NZ GPT PRO</h1>
           <p className="text-gray-400 mb-10">نظام المحادثة الذكي المتطور</p>
           <div className="flex flex-col gap-4">
-            <button onClick={handleGoogleLogin} className="w-full bg-white text-gray-900 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">المتابعة باستخدام Google</button>
-            <button onClick={handleGuestLogin} className="w-full font-bold py-4 rounded-2xl flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 active:scale-95 transition-all">تجربة كزائر</button>
+            <button onClick={async () => { if (!isFirebaseInitialized || !auth || !googleProvider) return; try { await signInWithPopup(auth, googleProvider); } catch (e) { showNotification("فشل تسجيل الدخول"); } }} className="w-full bg-white text-gray-900 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">المتابعة باستخدام Google</button>
+            <button onClick={() => { setUser({ uid: 'guest-' + Date.now(), displayName: 'زائر', email: 'guest@nzgpt.pro', photoURL: null }); setIsGuest(true); }} className="w-full font-bold py-4 rounded-2xl flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 active:scale-95 transition-all">تجربة كزائر</button>
           </div>
         </div>
       </div>
@@ -186,9 +176,9 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative" dir="rtl">
-        {/* Header - Fixed & High Z-Index */}
+        {/* Header - Fixed to prevent layout shifts */}
         <header className="flex items-center justify-between px-4 sm:px-8 py-3 bg-[#171717] border-b border-white/5 shrink-0 z-[100] relative">
-            {/* Visual Right: History Dropdown */}
+            {/* Visual Right: History Dropdown (Aligned Right in RTL) */}
             <div className="relative" ref={historyDropdownRef}>
                 <button onClick={() => setShowHistoryDropdown(!showHistoryDropdown)} className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all">
                     <History size={22} />
@@ -209,7 +199,7 @@ function App() {
                 )}
             </div>
 
-            {/* Visual Left: New Chat & User Profile */}
+            {/* Visual Left: New Chat & User Profile (Aligned Left in RTL) */}
             <div className="flex items-center gap-3 sm:gap-6">
                 <button onClick={createNewChat} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 sm:px-6 py-2 sm:py-2.5 rounded-2xl transition-all active:scale-95 shadow-lg">
                     <Plus size={18} />
