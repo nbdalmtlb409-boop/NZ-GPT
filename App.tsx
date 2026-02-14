@@ -186,15 +186,15 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative" dir="rtl">
-        {/* Header - Optimized for Laptop/Tablet */}
-        <header className="flex items-center justify-between px-4 sm:px-8 py-3 bg-[#171717] border-b border-white/5 shrink-0 z-[60]">
-            {/* Visual Right: History */}
+        {/* Header - Fixed & High Z-Index */}
+        <header className="flex items-center justify-between px-4 sm:px-8 py-3 bg-[#171717] border-b border-white/5 shrink-0 z-[100] relative">
+            {/* Visual Right: History Dropdown */}
             <div className="relative" ref={historyDropdownRef}>
-                <button onClick={() => setShowHistoryDropdown(!showHistoryDropdown)} className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all shadow-sm">
+                <button onClick={() => setShowHistoryDropdown(!showHistoryDropdown)} className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all">
                     <History size={22} />
                 </button>
                 {showHistoryDropdown && (
-                    <div className="absolute top-full right-0 mt-3 w-72 sm:w-80 max-h-[70vh] bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-y-auto z-[70] animate-in fade-in zoom-in-95 origin-top-right">
+                    <div className="absolute top-full right-0 mt-3 w-72 sm:w-80 max-h-[70vh] bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-y-auto z-[110] animate-in fade-in zoom-in-95 origin-top-right">
                         <div className="p-4 border-b border-white/5 sticky top-0 bg-[#1a1a1a] font-bold text-xs text-gray-500">المحادثات السابقة</div>
                         <div className="p-2 space-y-1">
                             {chatHistory.length ? chatHistory.map(c => (
@@ -219,7 +219,7 @@ function App() {
                 <div className="relative" ref={profileDropdownRef}>
                     <button 
                       onClick={() => setShowProfileDropdown(!showProfileDropdown)} 
-                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-white/10 bg-emerald-500/10 flex items-center justify-center hover:border-emerald-500 transition-all text-emerald-400 font-black text-lg overflow-hidden"
+                      className="w-10 h-10 sm:w-11 sm:h-11 rounded-full border-2 border-white/10 bg-emerald-500/10 flex items-center justify-center hover:border-emerald-500 transition-all text-emerald-400 font-black text-lg overflow-hidden shrink-0"
                     >
                         {user.photoURL ? (
                           <img src={user.photoURL} className="w-full h-full object-cover" />
@@ -228,17 +228,17 @@ function App() {
                         )}
                     </button>
                     {showProfileDropdown && (
-                        <div className="absolute top-full left-0 mt-3 w-64 sm:w-72 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[70] p-2 animate-in fade-in zoom-in-95 origin-top-left">
-                            <div className="p-4 border-b border-white/5 mb-1 overflow-hidden">
+                        <div className="absolute top-full left-0 mt-3 w-64 sm:w-72 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl z-[120] p-1.5 animate-in fade-in zoom-in-95 origin-top-left">
+                            <div className="p-4 border-b border-white/5 mb-1 bg-white/5 rounded-t-xl">
                                 <p className="text-sm font-black text-white truncate mb-1">{user.displayName || "مستخدم NZ GPT"}</p>
-                                <div className="flex items-center gap-2 text-gray-500 group">
-                                  <Mail size={12} className="shrink-0" />
-                                  <p className="text-[11px] font-medium break-all">{user.email}</p>
+                                <div className="flex items-start gap-2 text-gray-400 mt-2">
+                                  <Mail size={12} className="shrink-0 mt-0.5" />
+                                  <p className="text-[11px] font-medium break-all leading-tight">{user.email}</p>
                                 </div>
                             </div>
-                            <div className="p-1">
-                                <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3.5 text-sm text-red-400 hover:bg-red-500/10 rounded-xl transition-colors font-black">
-                                    <LogOut size={18} />
+                            <div className="mt-1">
+                                <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3.5 text-sm text-red-400 hover:bg-red-500/10 rounded-xl transition-all font-black">
+                                    <LogOut size={18} className="shrink-0" />
                                     <span>تسجيل الخروج</span>
                                 </button>
                             </div>
