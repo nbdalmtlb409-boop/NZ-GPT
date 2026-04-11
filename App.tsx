@@ -7,7 +7,8 @@ import MessageItem from './components/MessageItem';
 
 // Firebase Imports
 import { auth, googleProvider, db, isFirebaseInitialized } from './firebaseConfig';
-import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence } from 'firebase/auth';
+// We'll keep the imports for now to avoid breaking other parts, but we won't use Auth/Firestore for data
+import { User } from 'firebase/auth';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // المكون الرسومي للوجو لضمان الدقة
@@ -15,16 +16,23 @@ export const BrandLogo = ({ className = "w-24 h-24" }: { className?: string }) =
   <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
     <rect width="100" height="100" rx="25" fill="#10b981"/>
     <path d="M50 20C50 36.5 43.5 50 27 50C43.5 50 50 63.5 50 80C50 63.5 56.5 50 73 50C56.5 50 50 36.5 50 20Z" fill="white"/>
-    <path d="M25 25V35M20 30H30" stroke="white" stroke-width="4" stroke-linecap="round"/>
-    <path d="M75 65V75M70 70H80" stroke="white" stroke-width="4" stroke-linecap="round"/>
+    <path d="M25 25V35M20 30H30" stroke="white" strokeWidth="4" strokeLinecap="round"/>
+    <path d="M75 65V75M70 70H80" stroke="white" strokeWidth="4" strokeLinecap="round"/>
   </svg>
 );
 
 function App() {
-  const [user, setUser] = useState<User | any | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
-  const [isGuest, setIsGuest] = useState(false);
+  // Default local user
+  const localUser = {
+    uid: 'local-user',
+    displayName: 'مستخدم محلي',
+    email: 'local@device',
+    photoURL: null
+  };
+
+  const [user, setUser] = useState<any>(localUser);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [isGuest, setIsGuest] = useState(true);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
@@ -53,62 +61,26 @@ function App() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // Load chat history from LocalStorage on mount
   useEffect(() => {
-    if (!isFirebaseInitialized || !auth) {
-      setAuthLoading(false);
-      return;
+    const savedHistory = localStorage.getItem('nzgpt_local_history');
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory);
+        setChatHistory(parsed.sort((a: any, b: any) => b.updatedAt - a.updatedAt));
+      } catch (e) {
+        console.error("Failed to parse history", e);
+      }
     }
-
-    // Ensure persistence is set to LOCAL for WebViews
-    setPersistence(auth, browserLocalPersistence).catch(console.error);
-
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        setIsGuest(false);
-        localStorage.removeItem('nzgpt_guest_user');
-      } else {
-        const savedGuest = localStorage.getItem('nzgpt_guest_user');
-        if (savedGuest) {
-          setUser(JSON.parse(savedGuest));
-          setIsGuest(true);
-        } else {
-          setUser(null);
-        }
-      }
-      setAuthLoading(false);
-    });
-
-    // Handle Redirect Result with improved logic
-    getRedirectResult(auth).then((result) => {
-      if (result?.user) {
-        setUser(result.user);
-        setIsGuest(false);
-        localStorage.removeItem('nzgpt_guest_user');
-      }
-      setIsCheckingRedirect(false);
-    }).catch((error) => {
-      console.error("Redirect Error:", error);
-      setIsCheckingRedirect(false);
-    });
-
-    return () => unsubscribe();
   }, []);
 
+  // Save chat history to LocalStorage whenever it changes
   useEffect(() => {
-    if (user && db && !isGuest) {
-      const q = query(collection(db, "chats"), where("userId", "==", user.uid));
-      const unsubscribeChats = onSnapshot(q, (snapshot) => {
-        const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession));
-        history.sort((a, b) => b.updatedAt - a.updatedAt);
-        setChatHistory(history);
-      });
-      return () => unsubscribeChats();
-    } else if (isGuest) {
-      // For guests, we could load from localStorage if we wanted, but for now just clear
-      setChatHistory([]);
+    if (chatHistory.length > 0 || localStorage.getItem('nzgpt_local_history')) {
+      localStorage.setItem('nzgpt_local_history', JSON.stringify(chatHistory));
     }
-  }, [user, isGuest]);
+  }, [chatHistory]);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -137,15 +109,13 @@ function App() {
 
   const handleLogout = async () => {
     setShowConfirmModal({
-      title: "تسجيل الخروج",
-      message: "هل أنت متأكد من تسجيل الخروج؟",
+      title: "مسح البيانات",
+      message: "هل أنت متأكد من مسح جميع المحادثات والبيانات المحلية؟ لا يمكن التراجع عن هذا الإجراء.",
       onConfirm: async () => {
-        if (auth && !isGuest) await signOut(auth);
-        else { 
-          setUser(null); 
-          setIsGuest(false); 
-          localStorage.removeItem('nzgpt_guest_user');
-        }
+        setChatHistory([]);
+        setCurrentChatId(null);
+        setMessages([]);
+        localStorage.removeItem('nzgpt_local_history');
         setShowProfileDropdown(false);
         setShowConfirmModal(null);
       }
@@ -166,17 +136,18 @@ function App() {
       title: "حذف المحادثة",
       message: "هل أنت متأكد من حذف هذه المحادثة نهائياً؟",
       onConfirm: async () => {
-        if (!db) return;
-        try {
-          await deleteDoc(doc(db, "chats", chatId));
-          if (currentChatId === chatId) createNewChat();
-        } catch (error) { showNotification("فشل الحذف"); }
+        setChatHistory(prev => prev.filter(c => c.id !== chatId));
+        if (currentChatId === chatId) createNewChat();
         setShowConfirmModal(null);
       }
     });
   };
 
   const handleSendMessage = async () => {
+    if (!isOnline) {
+      showNotification("معندكش نت برا دير جني في وقته يا سيدها", "error");
+      return;
+    }
     if (!inputText.trim() && !selectedImage || isLoading || isStreaming) return;
     const nextMsgCount = messageCountForAds + 1;
     setMessageCountForAds(nextMsgCount);
@@ -194,7 +165,9 @@ function App() {
     try {
       const botMsgId = (Date.now() + 100).toString();
       let isFirst = true;
+      let fullResponse = "";
       await sendMessageToNZGPT(updatedMessages, userMsg.text, (streamed) => {
+        fullResponse = streamed;
         if (isFirst) {
           setIsLoading(false); setIsStreaming(true);
           setMessages(prev => [...prev, { id: botMsgId, role: Role.MODEL, text: streamed, timestamp: Date.now() }]);
@@ -203,6 +176,24 @@ function App() {
           setMessages(prev => prev.map(m => m.id === botMsgId ? { ...m, text: streamed } : m));
         }
       }, tempImg || undefined, abortControllerRef.current.signal);
+
+      // Save to local history
+      const finalMessages = [...updatedMessages, { id: botMsgId, role: Role.MODEL, text: fullResponse, timestamp: Date.now() }];
+      if (currentChatId) {
+        setChatHistory(prev => prev.map(c => c.id === currentChatId ? { ...c, messages: finalMessages, updatedAt: Date.now() } : c));
+      } else {
+        const newId = Date.now().toString();
+        const newChat: ChatSession = {
+          id: newId,
+          title: userMsg.text.substring(0, 30) || 'محادثة جديدة',
+          messages: finalMessages,
+          userId: user.uid,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        setChatHistory(prev => [newChat, ...prev]);
+        setCurrentChatId(newId);
+      }
     } catch (e) { setIsLoading(false); } finally { setIsStreaming(false); }
   };
 
@@ -227,39 +218,9 @@ function App() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    if (!isFirebaseInitialized || !auth || !googleProvider) return;
-    try {
-      // Use Redirect for better compatibility with WebViews (Median.co / GoNative)
-      await signInWithRedirect(auth, googleProvider);
-    } catch (e) {
-      console.error(e);
-      showNotification("فشل بدء تسجيل الدخول");
-    }
-  };
+  if (authLoading) return <div className="h-screen w-screen bg-[#212121] flex flex-col items-center justify-center gap-4"><BrandLogo className="w-16 h-16 animate-pulse" /><p className="text-emerald-500 text-xs font-bold animate-pulse">جاري التحميل...</p></div>;
 
-  if (authLoading || isCheckingRedirect) return <div className="h-screen w-screen bg-[#212121] flex flex-col items-center justify-center gap-4"><BrandLogo className="w-16 h-16 animate-pulse" /><p className="text-emerald-500 text-xs font-bold animate-pulse">جاري التحقق من الحساب...</p></div>;
-
-  if (!user) {
-    return (
-      <div className="flex flex-col h-screen w-screen bg-[#212121] items-center justify-center p-6">
-        <div className="z-10 bg-[#2a2a2a] border border-white/5 p-10 rounded-[40px] shadow-2xl max-w-md w-full text-center">
-          <div className="mb-8 flex justify-center"><BrandLogo className="w-28 h-28" /></div>
-          <h1 className="text-4xl font-black text-white mb-2 tracking-tighter">NZ GPT PRO</h1>
-          <p className="text-gray-400 mb-10">نظام المحادثة الذكي المتطور</p>
-          <div className="flex flex-col gap-4">
-            <button onClick={handleGoogleLogin} className="w-full bg-white text-gray-900 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">المتابعة باستخدام Google</button>
-            <button onClick={() => { 
-              const guestUser = { uid: 'guest-' + Date.now(), displayName: 'زائر', email: 'guest@nzgpt.pro', photoURL: null };
-              setUser(guestUser); 
-              setIsGuest(true); 
-              localStorage.setItem('nzgpt_guest_user', JSON.stringify(guestUser));
-            }} className="w-full font-bold py-4 rounded-2xl flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 active:scale-95 transition-all">تجربة كزائر</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative" dir="rtl">
@@ -320,7 +281,7 @@ function App() {
                 </button>
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3.5 text-sm text-red-400 hover:bg-red-500/10 rounded-xl transition-all font-black">
                     <LogOut size={18} className="shrink-0" />
-                    <span>تسجيل الخروج</span>
+                    <span>مسح كافة البيانات</span>
                 </button>
             </div>
                         </div>
