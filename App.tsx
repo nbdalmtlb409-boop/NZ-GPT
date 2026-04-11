@@ -223,7 +223,7 @@ function App() {
   if (!user) return null;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative" dir="rtl">
+    <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative" style={{ overscrollBehavior: 'none' }} dir="rtl">
         {/* Header - Fixed to prevent layout shifts */}
         <header className="flex items-center justify-between px-4 sm:px-8 py-3 bg-[#171717] border-b border-white/5 shrink-0 z-[100] relative">
             {/* Visual Right: History Dropdown (Aligned Right in RTL) */}
