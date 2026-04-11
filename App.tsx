@@ -92,6 +92,14 @@ function App() {
     };
   }, []);
 
+  // Refresh ads every 90 seconds (1 minute and 30 seconds)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setAdRefreshKey(prev => prev + 1);
+    }, 90000); // 90,000 ms = 1:30 min
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
