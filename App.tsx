@@ -23,6 +23,7 @@ export const BrandLogo = ({ className = "w-24 h-24" }: { className?: string }) =
 function App() {
   const [user, setUser] = useState<User | any | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isCheckingRedirect, setIsCheckingRedirect] = useState(true);
   const [isGuest, setIsGuest] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
@@ -85,8 +86,10 @@ function App() {
         setIsGuest(false);
         localStorage.removeItem('nzgpt_guest_user');
       }
+      setIsCheckingRedirect(false);
     }).catch((error) => {
       console.error("Redirect Error:", error);
+      setIsCheckingRedirect(false);
     });
 
     return () => unsubscribe();
@@ -235,7 +238,7 @@ function App() {
     }
   };
 
-  if (authLoading) return <div className="h-screen w-screen bg-[#212121] flex items-center justify-center"><BrandLogo className="w-16 h-16 animate-pulse" /></div>;
+  if (authLoading || isCheckingRedirect) return <div className="h-screen w-screen bg-[#212121] flex flex-col items-center justify-center gap-4"><BrandLogo className="w-16 h-16 animate-pulse" /><p className="text-emerald-500 text-xs font-bold animate-pulse">جاري التحقق من الحساب...</p></div>;
 
   if (!user) {
     return (
