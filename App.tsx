@@ -7,7 +7,7 @@ import MessageItem from './components/MessageItem';
 
 // Firebase Imports
 import { auth, googleProvider, db, isFirebaseInitialized } from './firebaseConfig';
-import { signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged, User, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { collection, addDoc, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 // المكون الرسومي للوجو لضمان الدقة
@@ -45,6 +45,8 @@ function App() {
   const historyDropdownRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
 
+  const [showConfirmModal, setShowConfirmModal] = useState<{title: string, message: string, onConfirm: () => void} | null>(null);
+
   const showNotification = (message: string, type: 'error' | 'success' = 'error') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
@@ -55,22 +57,55 @@ function App() {
       setAuthLoading(false);
       return;
     }
+
+    // Ensure persistence is set to LOCAL for WebViews
+    setPersistence(auth, browserLocalPersistence).catch(console.error);
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-      if (currentUser && db) {
-        const q = query(collection(db, "chats"), where("userId", "==", currentUser.uid));
-        const unsubscribeChats = onSnapshot(q, (snapshot) => {
-          const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession));
-          history.sort((a, b) => b.updatedAt - a.updatedAt);
-          setChatHistory(history);
-        });
-        return () => unsubscribeChats();
+      if (currentUser) {
+        setUser(currentUser);
+        setIsGuest(false);
+        localStorage.removeItem('nzgpt_guest_user');
+      } else {
+        const savedGuest = localStorage.getItem('nzgpt_guest_user');
+        if (savedGuest) {
+          setUser(JSON.parse(savedGuest));
+          setIsGuest(true);
+        } else {
+          setUser(null);
+        }
       }
+      setAuthLoading(false);
     });
+
+    // Handle Redirect Result with improved logic
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) {
+        setUser(result.user);
+        setIsGuest(false);
+        localStorage.removeItem('nzgpt_guest_user');
+      }
+    }).catch((error) => {
+      console.error("Redirect Error:", error);
+    });
+
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (user && db && !isGuest) {
+      const q = query(collection(db, "chats"), where("userId", "==", user.uid));
+      const unsubscribeChats = onSnapshot(q, (snapshot) => {
+        const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatSession));
+        history.sort((a, b) => b.updatedAt - a.updatedAt);
+        setChatHistory(history);
+      });
+      return () => unsubscribeChats();
+    } else if (isGuest) {
+      // For guests, we could load from localStorage if we wanted, but for now just clear
+      setChatHistory([]);
+    }
+  }, [user, isGuest]);
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -98,11 +133,20 @@ function App() {
   }, []);
 
   const handleLogout = async () => {
-    if (window.confirm("هل أنت متأكد من تسجيل الخروج؟")) {
-      if (auth && !isGuest) await signOut(auth);
-      else { setUser(null); setIsGuest(false); }
-      setShowProfileDropdown(false);
-    }
+    setShowConfirmModal({
+      title: "تسجيل الخروج",
+      message: "هل أنت متأكد من تسجيل الخروج؟",
+      onConfirm: async () => {
+        if (auth && !isGuest) await signOut(auth);
+        else { 
+          setUser(null); 
+          setIsGuest(false); 
+          localStorage.removeItem('nzgpt_guest_user');
+        }
+        setShowProfileDropdown(false);
+        setShowConfirmModal(null);
+      }
+    });
   };
 
   const createNewChat = () => { setMessages([]); setCurrentChatId(null); };
@@ -115,11 +159,18 @@ function App() {
 
   const handleDeleteChat = async (e: React.MouseEvent, chatId: string) => {
     e.stopPropagation();
-    if (!window.confirm("حذف المحادثة؟") || !db) return;
-    try {
-      await deleteDoc(doc(db, "chats", chatId));
-      if (currentChatId === chatId) createNewChat();
-    } catch (error) { showNotification("فشل الحذف"); }
+    setShowConfirmModal({
+      title: "حذف المحادثة",
+      message: "هل أنت متأكد من حذف هذه المحادثة نهائياً؟",
+      onConfirm: async () => {
+        if (!db) return;
+        try {
+          await deleteDoc(doc(db, "chats", chatId));
+          if (currentChatId === chatId) createNewChat();
+        } catch (error) { showNotification("فشل الحذف"); }
+        setShowConfirmModal(null);
+      }
+    });
   };
 
   const handleSendMessage = async () => {
@@ -156,6 +207,34 @@ function App() {
     return name ? name.trim().charAt(0).toUpperCase() : 'N';
   };
 
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'NZ GPT PRO',
+          text: 'جرب NZ GPT PRO - نظام المحادثة الذكي المتطور!',
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      showNotification("تم نسخ الرابط", "success");
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    if (!isFirebaseInitialized || !auth || !googleProvider) return;
+    try {
+      // Use Redirect for better compatibility with WebViews (Median.co / GoNative)
+      await signInWithRedirect(auth, googleProvider);
+    } catch (e) {
+      console.error(e);
+      showNotification("فشل بدء تسجيل الدخول");
+    }
+  };
+
   if (authLoading) return <div className="h-screen w-screen bg-[#212121] flex items-center justify-center"><BrandLogo className="w-16 h-16 animate-pulse" /></div>;
 
   if (!user) {
@@ -166,8 +245,13 @@ function App() {
           <h1 className="text-4xl font-black text-white mb-2 tracking-tighter">NZ GPT PRO</h1>
           <p className="text-gray-400 mb-10">نظام المحادثة الذكي المتطور</p>
           <div className="flex flex-col gap-4">
-            <button onClick={async () => { if (!isFirebaseInitialized || !auth || !googleProvider) return; try { await signInWithPopup(auth, googleProvider); } catch (e) { showNotification("فشل تسجيل الدخول"); } }} className="w-full bg-white text-gray-900 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">المتابعة باستخدام Google</button>
-            <button onClick={() => { setUser({ uid: 'guest-' + Date.now(), displayName: 'زائر', email: 'guest@nzgpt.pro', photoURL: null }); setIsGuest(true); }} className="w-full font-bold py-4 rounded-2xl flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 active:scale-95 transition-all">تجربة كزائر</button>
+            <button onClick={handleGoogleLogin} className="w-full bg-white text-gray-900 font-bold py-4 rounded-2xl flex items-center justify-center gap-3 active:scale-95 transition-all">المتابعة باستخدام Google</button>
+            <button onClick={() => { 
+              const guestUser = { uid: 'guest-' + Date.now(), displayName: 'زائر', email: 'guest@nzgpt.pro', photoURL: null };
+              setUser(guestUser); 
+              setIsGuest(true); 
+              localStorage.setItem('nzgpt_guest_user', JSON.stringify(guestUser));
+            }} className="w-full font-bold py-4 rounded-2xl flex items-center justify-center gap-3 bg-white/5 hover:bg-white/10 text-white border border-white/10 active:scale-95 transition-all">تجربة كزائر</button>
           </div>
         </div>
       </div>
@@ -226,12 +310,16 @@ function App() {
                                   <p className="text-[11px] font-medium break-all leading-tight">{user.email}</p>
                                 </div>
                             </div>
-                            <div className="mt-1">
-                                <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3.5 text-sm text-red-400 hover:bg-red-500/10 rounded-xl transition-all font-black">
-                                    <LogOut size={18} className="shrink-0" />
-                                    <span>تسجيل الخروج</span>
-                                </button>
-                            </div>
+            <div className="flex flex-col gap-4">
+                <button onClick={handleShare} className="w-full flex items-center gap-3 p-3.5 text-sm text-emerald-400 hover:bg-emerald-500/10 rounded-xl transition-all font-black">
+                    <Send size={18} className="shrink-0" />
+                    <span>مشاركة التطبيق</span>
+                </button>
+                <button onClick={handleLogout} className="w-full flex items-center gap-3 p-3.5 text-sm text-red-400 hover:bg-red-500/10 rounded-xl transition-all font-black">
+                    <LogOut size={18} className="shrink-0" />
+                    <span>تسجيل الخروج</span>
+                </button>
+            </div>
                         </div>
                     )}
                 </div>
@@ -300,6 +388,27 @@ function App() {
             <p className="text-center mt-3 text-[10px] text-gray-700 font-black tracking-[3px] uppercase opacity-30">Powered by NZ GPT PRO</p>
           </div>
       </div>
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed bottom-24 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4 ${notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'}`}>
+          {notification.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
+          <span className="font-bold text-sm">{notification.message}</span>
+        </div>
+      )}
+
+      {/* Confirm Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-white mb-2">{showConfirmModal.title}</h3>
+            <p className="text-gray-400 text-sm mb-8 font-medium leading-relaxed">{showConfirmModal.message}</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowConfirmModal(null)} className="flex-1 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-black transition-all">إلغاء</button>
+              <button onClick={showConfirmModal.onConfirm} className="flex-1 py-3.5 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-black transition-all shadow-lg shadow-red-500/20">تأكيد</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
