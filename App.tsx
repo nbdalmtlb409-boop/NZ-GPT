@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, X, StopCircle, Trash2, Plus, MessageSquare, History, LogOut, Mail, User as UserIcon, CheckCircle, AlertCircle } from 'lucide-react';
+import { Send, Paperclip, X, StopCircle, Trash2, Plus, MessageSquare, History, LogOut, Mail, User as UserIcon, CheckCircle, AlertCircle, Flag } from 'lucide-react';
 import { Message, Role, ChatSession } from './types';
 import { sendMessageToNZGPT } from './services/geminiService';
 import MessageItem from './components/MessageItem';
@@ -55,6 +55,10 @@ function App() {
   const profileDropdownRef = useRef<HTMLDivElement>(null);
 
   const [showConfirmModal, setShowConfirmModal] = useState<{title: string, message: string, onConfirm: () => void} | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportEmail, setReportEmail] = useState('');
+  const [reportMessage, setReportMessage] = useState('');
+  const [isSendingReport, setIsSendingReport] = useState(false);
 
   const showNotification = (message: string, type: 'error' | 'success' = 'error') => {
     setNotification({ message, type });
@@ -226,6 +230,28 @@ function App() {
     }
   };
 
+  const handleSendReport = () => {
+    if (!reportEmail.trim() || !reportMessage.trim()) {
+      showNotification("يرجى ملء جميع الحقول");
+      return;
+    }
+    setIsSendingReport(true);
+    
+    // Simulate sending or use mailto
+    const subject = encodeURIComponent("تبليغ عن محتوى أو خطأ - NZ GPT PRO");
+    const body = encodeURIComponent(`البريد الإلكتروني للمرسل: ${reportEmail}\n\nالرسالة:\n${reportMessage}`);
+    
+    // We use a timeout to simulate a network request before opening the mail client
+    setTimeout(() => {
+      window.location.href = `mailto:nbdalmtlb409@gmail.com?subject=${subject}&body=${body}`;
+      setIsSendingReport(false);
+      setShowReportModal(false);
+      setReportEmail('');
+      setReportMessage('');
+      showNotification("تم تجهيز التقرير، يرجى إرساله عبر تطبيق البريد", "success");
+    }, 1000);
+  };
+
   if (authLoading) return <div className="h-screen w-screen bg-[#212121] flex flex-col items-center justify-center gap-4"><BrandLogo className="w-16 h-16 animate-pulse" /><p className="text-emerald-500 text-xs font-bold animate-pulse">جاري التحميل...</p></div>;
 
   if (!user) return null;
@@ -234,25 +260,30 @@ function App() {
     <div className="flex flex-col h-screen w-screen bg-[#212121] text-gray-100 overflow-hidden relative" style={{ overscrollBehavior: 'none' }} dir="rtl">
         {/* Header - Fixed to prevent layout shifts */}
         <header className="flex items-center justify-between px-4 sm:px-8 py-3 bg-[#171717] border-b border-white/5 shrink-0 z-[100] relative">
-            {/* Visual Right: History Dropdown (Aligned Right in RTL) */}
-            <div className="relative" ref={historyDropdownRef}>
-                <button onClick={() => setShowHistoryDropdown(!showHistoryDropdown)} className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all">
-                    <History size={22} />
-                </button>
-                {showHistoryDropdown && (
-                    <div className="absolute top-full right-0 mt-3 w-72 sm:w-80 max-h-[70vh] bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-y-auto z-[110] animate-in fade-in zoom-in-95 origin-top-right">
-                        <div className="p-4 border-b border-white/5 sticky top-0 bg-[#1a1a1a] font-bold text-xs text-gray-500">المحادثات السابقة</div>
-                        <div className="p-2 space-y-1">
-                            {chatHistory.length ? chatHistory.map(c => (
-                                <div key={c.id} className="group relative flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors" onClick={() => loadChat(c)}>
-                                    <MessageSquare size={16} className="text-emerald-500 shrink-0" />
-                                    <span className="text-sm truncate flex-1">{c.title}</span>
-                                    <button onClick={(e) => handleDeleteChat(e, c.id)} className="p-1 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
-                                </div>
-                            )) : <div className="p-8 text-center text-xs text-gray-600">لا يوجد سجل</div>}
+            {/* Visual Right: History & Report (Aligned Right in RTL) */}
+            <div className="flex items-center gap-2">
+                <div className="relative" ref={historyDropdownRef}>
+                    <button onClick={() => setShowHistoryDropdown(!showHistoryDropdown)} className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-white transition-all">
+                        <History size={22} />
+                    </button>
+                    {showHistoryDropdown && (
+                        <div className="absolute top-full right-0 mt-3 w-72 sm:w-80 max-h-[70vh] bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-y-auto z-[110] animate-in fade-in zoom-in-95 origin-top-right">
+                            <div className="p-4 border-b border-white/5 sticky top-0 bg-[#1a1a1a] font-bold text-xs text-gray-500">المحادثات السابقة</div>
+                            <div className="p-2 space-y-1">
+                                {chatHistory.length ? chatHistory.map(c => (
+                                    <div key={c.id} className="group relative flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors" onClick={() => loadChat(c)}>
+                                        <MessageSquare size={16} className="text-emerald-500 shrink-0" />
+                                        <span className="text-sm truncate flex-1">{c.title}</span>
+                                        <button onClick={(e) => handleDeleteChat(e, c.id)} className="p-1 text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                    </div>
+                                )) : <div className="p-8 text-center text-xs text-gray-600">لا يوجد سجل</div>}
+                            </div>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
+                <button onClick={() => setShowReportModal(true)} className="p-2.5 bg-white/5 rounded-xl text-gray-400 hover:text-red-400 transition-all" title="تبليغ">
+                    <Flag size={22} />
+                </button>
             </div>
 
             {/* Visual Left: New Chat & User Profile (Aligned Left in RTL) */}
@@ -368,15 +399,54 @@ function App() {
         </div>
       )}
 
-      {/* Confirm Modal */}
-      {showConfirmModal && (
+      {/* Report Modal */}
+      {showReportModal && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-[32px] p-8 max-w-sm w-full shadow-2xl animate-in zoom-in-95">
-            <h3 className="text-xl font-black text-white mb-2">{showConfirmModal.title}</h3>
-            <p className="text-gray-400 text-sm mb-8 font-medium leading-relaxed">{showConfirmModal.message}</p>
-            <div className="flex gap-3">
-              <button onClick={() => setShowConfirmModal(null)} className="flex-1 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-black transition-all">إلغاء</button>
-              <button onClick={showConfirmModal.onConfirm} className="flex-1 py-3.5 rounded-2xl bg-red-500 hover:bg-red-600 text-white font-black transition-all shadow-lg shadow-red-500/20">تأكيد</button>
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-[32px] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-red-500/10 rounded-2xl text-red-500">
+                <Flag size={24} />
+              </div>
+              <h3 className="text-2xl font-black text-white">إرسال تبليغ</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2 mr-1">بريدك الإلكتروني</label>
+                <input 
+                  type="email" 
+                  value={reportEmail}
+                  onChange={(e) => setReportEmail(e.target.value)}
+                  placeholder="example@mail.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 px-4 text-white placeholder-gray-600 focus:border-emerald-500/50 transition-all outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-2 mr-1">الشكوى أو الملاحظة</label>
+                <textarea 
+                  value={reportMessage}
+                  onChange={(e) => setReportMessage(e.target.value)}
+                  placeholder="اكتب تفاصيل المشكلة هنا..."
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-3.5 px-4 text-white placeholder-gray-600 focus:border-emerald-500/50 transition-all outline-none resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-8">
+              <button 
+                onClick={() => setShowReportModal(false)} 
+                className="flex-1 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-black transition-all"
+              >
+                إلغاء
+              </button>
+              <button 
+                onClick={handleSendReport} 
+                disabled={isSendingReport}
+                className="flex-1 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+              >
+                {isSendingReport ? "جاري الإرسال..." : "إرسال التقرير"}
+              </button>
             </div>
           </div>
         </div>
